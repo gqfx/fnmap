@@ -426,7 +426,92 @@ export function analyzeFile(code: unknown, filePath: string | null): AnalyzeResu
     info.callGraph[caller] = Array.from(callees);
   }
 
+  // 检测是否为纯类型文件（只有 type/interface 声明，没有实际运行时代码）
+  info.isPureType = isPureTypeFile(ast);
+
   return info;
+}
+
+/**
+ * 检测是否为纯类型文件
+ * 纯类型文件只包含：type、interface、import type、export type 等类型声明
+ * 不包含实际的函数、类、变量定义
+ */
+function isPureTypeFile(ast: t.File): boolean {
+  let hasRuntimeCode = false;
+
+  for (const node of ast.program.body) {
+    switch (node.type) {
+      // 类型声明 - 允许
+      case 'TSTypeAliasDeclaration':
+      case 'TSInterfaceDeclaration':
+      case 'TSEnumDeclaration':
+        break;
+
+      // 导入声明 - 检查是否为类型导入
+      case 'ImportDeclaration':
+        if (node.importKind !== 'type') {
+          // 检查每个 specifier 是否都是类型导入
+          const hasValueImport = node.specifiers.some((spec) => {
+            if (spec.type === 'ImportSpecifier') {
+              return spec.importKind !== 'type';
+            }
+            // default 和 namespace 导入可能包含值
+            return true;
+          });
+          if (hasValueImport && node.specifiers.length > 0) {
+            hasRuntimeCode = true;
+          }
+        }
+        break;
+
+      // 导出声明 - 检查是否只导出类型
+      case 'ExportNamedDeclaration':
+        if (node.exportKind === 'type') {
+          // export type { ... } - 纯类型导出
+          break;
+        }
+        if (node.declaration) {
+          // 检查导出的声明是否为类型
+          const declType = node.declaration.type;
+          if (declType !== 'TSTypeAliasDeclaration' && declType !== 'TSInterfaceDeclaration') {
+            hasRuntimeCode = true;
+          }
+        } else if (node.specifiers && node.specifiers.length > 0) {
+          // export { ... } - 检查每个导出项是否为类型
+          const hasValueExport = node.specifiers.some((spec) => {
+            if (spec.type === 'ExportSpecifier') {
+              return spec.exportKind !== 'type';
+            }
+            return true;
+          });
+          if (hasValueExport) {
+            hasRuntimeCode = true;
+          }
+        }
+        break;
+
+      case 'ExportDefaultDeclaration':
+        // 默认导出通常是值
+        hasRuntimeCode = true;
+        break;
+
+      case 'ExportAllDeclaration':
+        if (node.exportKind !== 'type') {
+          hasRuntimeCode = true;
+        }
+        break;
+
+      // 其他所有声明都是运行时代码
+      default:
+        hasRuntimeCode = true;
+        break;
+    }
+
+    if (hasRuntimeCode) break;
+  }
+
+  return !hasRuntimeCode;
 }
 
 export { extractJSDocDescription };

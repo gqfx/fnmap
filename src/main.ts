@@ -196,6 +196,13 @@ export function main(): void {
     if (result.success) {
       processed++;
       const info = result.info;
+
+      // 跳过纯类型文件
+      if (info.isPureType) {
+        logger.info(`Skipped (pure type file) / 跳过纯类型文件`);
+        continue;
+      }
+
       logger.success(
         `Imports: ${info.imports.length}, Functions: ${info.functions.length}, Classes: ${info.classes.length}, Constants: ${info.constants.length}`
       );

@@ -88,6 +88,7 @@ export interface FileInfo {
   classes: ClassInfo[];
   constants: ConstantInfo[];
   callGraph: CallGraph;
+  isPureType?: boolean; // 是否为纯类型文件（只有 type/interface 声明）
 }
 
 export interface ParseErrorResult {

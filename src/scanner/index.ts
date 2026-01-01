@@ -5,6 +5,13 @@ import { SUPPORTED_EXTENSIONS, DEFAULT_EXCLUDES, MAX_DIR_DEPTH } from '../consta
 import { logger } from '../cli';
 
 /**
+ * 检查是否为类型定义文件 (.d.ts)
+ */
+function isTypeDefinitionFile(filePath: string): boolean {
+  return filePath.endsWith('.d.ts') || filePath.endsWith('.d.tsx') || filePath.endsWith('.d.mts');
+}
+
+/**
  * 获取 git 仓库根目录
  */
 function getGitRoot(cwd: string): string | null {
@@ -63,7 +70,7 @@ export function getGitChangedFiles(projectDir: string, stagedOnly = false): stri
       .filter(Boolean)
       .filter((f) => {
         const ext = path.extname(f);
-        return (SUPPORTED_EXTENSIONS as readonly string[]).includes(ext);
+        return (SUPPORTED_EXTENSIONS as readonly string[]).includes(ext) && !isTypeDefinitionFile(f);
       });
 
     // 去重并转换为绝对路径（相对于 git 根目录）
@@ -99,7 +106,7 @@ export function scanSingleDirectory(dir: string): string[] {
     for (const entry of entries) {
       if (entry.isFile()) {
         const ext = path.extname(entry.name);
-        if ((SUPPORTED_EXTENSIONS as readonly string[]).includes(ext)) {
+        if ((SUPPORTED_EXTENSIONS as readonly string[]).includes(ext) && !isTypeDefinitionFile(entry.name)) {
           files.push(path.join(dir, entry.name));
         }
       }
@@ -174,7 +181,7 @@ export function scanDirectory(
         }
       } else if (entry.isFile()) {
         const ext = path.extname(entry.name);
-        if ((SUPPORTED_EXTENSIONS as readonly string[]).includes(ext)) {
+        if ((SUPPORTED_EXTENSIONS as readonly string[]).includes(ext) && !isTypeDefinitionFile(entry.name)) {
           files.push(path.relative(baseDir, fullPath));
         }
       }
