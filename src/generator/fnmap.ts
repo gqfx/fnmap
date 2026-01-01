@@ -17,7 +17,7 @@ export function generateAiMap(dirPath: string, filesInfo: FileInfoEntry[]): stri
 
     // 添加导入信息（不含使用位置，由函数行的调用图提供）
     for (const imp of info.imports) {
-      const members = imp.members.join(',');
+      const members = Array.isArray(imp.members) ? imp.members.join(',') : '';
       lines.push(`  <${imp.module}:${members}`);
     }
 
@@ -38,7 +38,7 @@ export function generateAiMap(dirPath: string, filesInfo: FileInfoEntry[]): stri
         // 追加调用信息
         const methodKey = `${cls.name}.${method.name}`;
         const calls = info.callGraph?.[methodKey] ?? info.callGraph?.[method.name];
-        if (calls && calls.length > 0) methodLine += ` →${calls.join(',')}`;
+        if (Array.isArray(calls) && calls.length > 0) methodLine += ` →${calls.join(',')}`;
         lines.push(methodLine);
       }
     }
@@ -49,7 +49,7 @@ export function generateAiMap(dirPath: string, filesInfo: FileInfoEntry[]): stri
       if (fn.description) fnLine += ` ${fn.description}`;
       // 追加调用信息
       const calls = info.callGraph?.[fn.name];
-      if (calls && calls.length > 0) fnLine += ` →${calls.join(',')}`;
+      if (Array.isArray(calls) && calls.length > 0) fnLine += ` →${calls.join(',')}`;
       lines.push(fnLine);
     }
 

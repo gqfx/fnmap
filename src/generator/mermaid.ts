@@ -39,6 +39,7 @@ export function generateFileMermaid(fileName: string, info: FileInfo): string | 
   // 添加调用关系边
   const callGraph = info.callGraph ?? {};
   for (const [caller, callees] of Object.entries(callGraph)) {
+    if (!Array.isArray(callees)) continue;
     for (const callee of callees) {
       // 只显示文件内部的调用关系
       if (allFunctions.includes(callee) || callee.includes('.')) {
@@ -83,6 +84,7 @@ export function generateProjectMermaid(_projectDir: string, allFilesInfo: FileIn
     // 收集调用边
     const callGraph = info.callGraph ?? {};
     for (const [caller, callees] of Object.entries(callGraph)) {
+      if (!Array.isArray(callees)) continue;
       for (const callee of callees) {
         allCallEdges.push({
           file: relativePath,

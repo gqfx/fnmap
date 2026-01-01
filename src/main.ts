@@ -216,10 +216,15 @@ export function main(): void {
   if (dirFilesMap.size > 0) {
     logger.info('\nGenerating .fnmap index...');
     for (const [dir, filesInfo] of dirFilesMap) {
-      const mapContent = generateAiMap(dir, filesInfo);
-      const mapPath = path.join(dir, '.fnmap');
-      fs.writeFileSync(mapPath, mapContent);
-      logger.success(path.relative(projectDir, mapPath));
+      try {
+        const mapContent = generateAiMap(dir, filesInfo);
+        const mapPath = path.join(dir, '.fnmap');
+        fs.writeFileSync(mapPath, mapContent);
+        logger.success(path.relative(projectDir, mapPath));
+      } catch (err) {
+        const error = err as Error;
+        logger.error(`Failed to generate .fnmap for ${path.relative(projectDir, dir)}: ${error.message}`);
+      }
     }
   }
 
@@ -231,25 +236,35 @@ export function main(): void {
       // 文件级：每个文件生成一个mermaid图
       for (const [dir, filesInfo] of dirFilesMap) {
         for (const { relativePath, info } of filesInfo) {
-          const mermaidContent = generateFileMermaid(relativePath, info);
-          if (mermaidContent) {
-            const baseName = path.basename(relativePath, path.extname(relativePath));
-            const mermaidPath = path.join(dir, `${baseName}.mermaid`);
-            fs.writeFileSync(mermaidPath, mermaidContent);
-            logger.success(path.relative(projectDir, mermaidPath));
+          try {
+            const mermaidContent = generateFileMermaid(relativePath, info);
+            if (mermaidContent) {
+              const baseName = path.basename(relativePath, path.extname(relativePath));
+              const mermaidPath = path.join(dir, `${baseName}.mermaid`);
+              fs.writeFileSync(mermaidPath, mermaidContent);
+              logger.success(path.relative(projectDir, mermaidPath));
+            }
+          } catch (err) {
+            const error = err as Error;
+            logger.error(`Failed to generate mermaid for ${relativePath}: ${error.message}`);
           }
         }
       }
     } else if (options.mermaid === 'project') {
       // 项目级：生成一个包含所有文件的mermaid图
-      const allFilesInfo: FileInfoEntry[] = [];
-      for (const [, filesInfo] of dirFilesMap) {
-        allFilesInfo.push(...filesInfo);
+      try {
+        const allFilesInfo: FileInfoEntry[] = [];
+        for (const [, filesInfo] of dirFilesMap) {
+          allFilesInfo.push(...filesInfo);
+        }
+        const mermaidContent = generateProjectMermaid(projectDir, allFilesInfo);
+        const mermaidPath = path.join(projectDir, '.fnmap.mermaid');
+        fs.writeFileSync(mermaidPath, mermaidContent);
+        logger.success(path.relative(projectDir, mermaidPath));
+      } catch (err) {
+        const error = err as Error;
+        logger.error(`Failed to generate project mermaid: ${error.message}`);
       }
-      const mermaidContent = generateProjectMermaid(projectDir, allFilesInfo);
-      const mermaidPath = path.join(projectDir, '.fnmap.mermaid');
-      fs.writeFileSync(mermaidPath, mermaidContent);
-      logger.success(path.relative(projectDir, mermaidPath));
     }
   }
 

@@ -14,9 +14,9 @@ export function generateHeader(info: FileInfo, fileName: string): string {
 
   // 导入信息
   for (const imp of info.imports) {
-    const members = imp.members.join(',');
+    const members = Array.isArray(imp.members) ? imp.members.join(',') : '';
     let line = `<${imp.module}:${members}`;
-    if (imp.usedIn?.length > 0) {
+    if (Array.isArray(imp.usedIn) && imp.usedIn.length > 0) {
       line += ` ->${imp.usedIn.join(',')}`;
     }
     lines.push(line);
