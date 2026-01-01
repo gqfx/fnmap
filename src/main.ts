@@ -8,6 +8,56 @@ import { scanDirectory, getGitChangedFiles, scanSingleDirectory } from './scanne
 import { processFile } from './processor';
 import { generateAiMap, generateFileMermaid, generateProjectMermaid } from './generator';
 
+/** fnmap 格式说明的英文版内容 */
+const FNMAP_DOCS_EN = `
+
+## .fnmap Code Index Format
+
+The \`.fnmap\` file provides a structured code index for quick navigation. Read it before exploring code to locate target files and function line numbers.
+
+**Format Reference:**
+
+- \`#filename.js\` - Filename followed by file description
+- \`<module:members\` - Imported module and its members
+- \`funcName(params) 10-20 description →callee1,callee2\` - Function signature, line range, description, call graph
+- \`ClassName:SuperClass 30-100\` - Class definition with inheritance
+- \`  .method(params) 35 →callee\` - Instance method (\`.\` prefix)
+- \`  +staticMethod(params) 40\` - Static method (\`+\` prefix)
+- \`CONST_NAME 5\` - Constant definition with line number
+
+**Call Graph:** The \`→\` at the end of function/method lines indicates which functions are called (both local and imported), helping you understand code execution flow.
+
+**Note:** \`.fnmap\` files are auto-maintained by scripts and should not be manually updated.
+`;
+
+/**
+ * 检查目录中是否存在 CLAUDE.md 或 AGENTS.md（忽略大小写），如果存在则追加 fnmap 文档
+ */
+function appendFnmapDocsToAgentFiles(projectDir: string): void {
+  const targetFiles = ['CLAUDE.md', 'AGENTS.md'];
+  const files = fs.readdirSync(projectDir);
+
+  for (const targetFile of targetFiles) {
+    // 忽略大小写查找匹配的文件
+    const matchedFile = files.find((f) => f.toLowerCase() === targetFile.toLowerCase());
+
+    if (matchedFile) {
+      const filePath = path.join(projectDir, matchedFile);
+      const content = fs.readFileSync(filePath, 'utf-8');
+
+      // 检查是否已经包含 fnmap 文档（避免重复添加）
+      if (content.includes('.fnmap Code Index Format')) {
+        console.log(`${COLORS.yellow}!${COLORS.reset} ${matchedFile} already contains fnmap documentation`);
+        continue;
+      }
+
+      // 追加文档
+      fs.appendFileSync(filePath, FNMAP_DOCS_EN);
+      console.log(`${COLORS.green}✓${COLORS.reset} Appended fnmap documentation to ${matchedFile}`);
+    }
+  }
+}
+
 /**
  * 主函数
  */
@@ -42,6 +92,9 @@ export function main(): void {
 
     fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2));
     console.log(`${COLORS.green}✓${COLORS.reset} Created config file: .fnmaprc`);
+
+    // 检查并更新 CLAUDE.md 或 AGENTS.md
+    appendFnmapDocsToAgentFiles(projectDir);
     return;
   }
 
