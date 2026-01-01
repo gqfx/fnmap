@@ -5,7 +5,7 @@ import {
   validateConfig,
   formatError,
   ErrorTypes 
-} from '../index';
+} from '../src/index';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';

@@ -1,8 +1,11 @@
-import { program, Command } from 'commander';
+import { Command } from 'commander';
 import { COLORS } from '../constants';
 
 // 日志工具
 let quietMode = false;
+
+// 使用模块级变量存储 program 实例
+let _program: Command | null = null;
 
 export const logger = {
   error: (msg: string): void => {
@@ -47,7 +50,10 @@ export function getVersion(): string {
  * 配置CLI命令
  */
 export function setupCLI(): Command {
-  program
+  // 每次创建新的 Command 实例以支持测试
+  _program = new Command();
+
+  _program
     .name('fnmap')
     .description('AI code indexing tool - Analyzes JS/TS code structure and generates structured code maps')
     .version(getVersion(), '-v, --version', 'Show version number')
@@ -90,7 +96,26 @@ Examples:
 `
     );
 
-  return program;
+  return _program;
 }
 
-export { program };
+// 导出 program getter
+export function getProgram(): Command {
+  if (!_program) {
+    return setupCLI();
+  }
+  return _program;
+}
+
+// 为了兼容性，导出 program 为 getter
+export const program = {
+  get opts() {
+    return getProgram().opts.bind(getProgram());
+  },
+  get args() {
+    return getProgram().args;
+  },
+  get parse() {
+    return getProgram().parse.bind(getProgram());
+  }
+};

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { analyzeFile, AnalyzeResult } from '../index';
+import { analyzeFile } from '../src/index';
 
 // 测试工具函数
 describe('Utility Functions', () => {

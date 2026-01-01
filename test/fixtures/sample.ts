@@ -35,4 +35,5 @@ class UserManager {
   }
 }
 
-export { UserManager, User };
+export { UserManager };
+export type { User };

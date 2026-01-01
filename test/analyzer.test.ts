@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { analyzeFile } from '../index';
+import { analyzeFile } from '../src/index';
 import fs from 'fs';
 import path from 'path';
 
@@ -11,18 +11,18 @@ describe('analyzeFile', () => {
     expect(result).toBeDefined();
     expect(result.parseError).toBeUndefined();
     expect(result.functions!).toHaveLength(3);
-    expect(result.functions![0].name).toBe('add');
-    expect(result.functions![0].params).toBe('a,b');
-    expect(result.functions![0].description).toContain('Add two numbers');
+    expect(result.functions![0]!.name).toBe('add');
+    expect(result.functions![0]!.params).toBe('a,b');
+    expect(result.functions![0]!.description).toContain('Add two numbers');
   });
 
   it('should extract function parameters correctly', () => {
     const code = fs.readFileSync(path.join(__dirname, 'fixtures/sample.js'), 'utf-8');
     const result = analyzeFile(code, 'sample.js');
 
-    const calculateFn = result.functions.find(f => f.name === 'calculate');
+    const calculateFn = result.functions!.find(f => f.name === 'calculate');
     expect(calculateFn).toBeDefined();
-    expect(calculateFn.params).toBe('x,y,z');
+    expect(calculateFn!.params).toBe('x,y,z');
   });
 
   it('should detect constants', () => {
@@ -30,7 +30,7 @@ describe('analyzeFile', () => {
     const result = analyzeFile(code, 'sample.js');
 
     expect(result.constants).toHaveLength(1);
-    expect(result.constants[0].name).toBe('MAX_SIZE');
+    expect(result.constants![0]!.name).toBe('MAX_SIZE');
   });
 
   it('should parse imports', () => {
@@ -38,9 +38,9 @@ describe('analyzeFile', () => {
     const result = analyzeFile(code, 'sample.js');
 
     expect(result.imports).toHaveLength(2);
-    const fsImport = result.imports.find(imp => imp.module === 'fs');
+    const fsImport = result.imports!.find(imp => imp.module === 'fs');
     expect(fsImport).toBeDefined();
-    expect(fsImport.members).toContain('fs');
+    expect(fsImport!.members).toContain('fs');
   });
 
   it('should analyze TypeScript files', () => {
@@ -50,7 +50,7 @@ describe('analyzeFile', () => {
     expect(result).toBeDefined();
     expect(result.parseError).toBeUndefined();
     expect(result.classes).toHaveLength(1);
-    expect(result.classes[0].name).toBe('UserManager');
+    expect(result.classes![0]!.name).toBe('UserManager');
   });
 
   it('should extract class methods', () => {
@@ -58,14 +58,14 @@ describe('analyzeFile', () => {
     const result = analyzeFile(code, 'sample-class.js');
 
     expect(result.classes).toHaveLength(1);
-    const myClass = result.classes[0];
-    expect(myClass.name).toBe('MyClass');
-    expect(myClass.superClass).toBe('EventEmitter');
-    expect(myClass.methods).toHaveLength(4); // constructor, increment, getCount, create
+    const myClass = result.classes![0];
+    expect(myClass!.name).toBe('MyClass');
+    expect(myClass!.superClass).toBe('EventEmitter');
+    expect(myClass!.methods).toHaveLength(4); // constructor, increment, getCount, create
     
-    const staticMethod = myClass.methods.find(m => m.name === 'create');
+    const staticMethod = myClass!.methods.find(m => m.name === 'create');
     expect(staticMethod).toBeDefined();
-    expect(staticMethod.static).toBe(true);
+    expect(staticMethod!.static).toBe(true);
   });
 
   it('should build call graph', () => {
@@ -73,9 +73,9 @@ describe('analyzeFile', () => {
     const result = analyzeFile(code, 'sample.js');
 
     expect(result.callGraph).toBeDefined();
-    expect(result.callGraph.calculate).toBeDefined();
-    expect(result.callGraph.calculate).toContain('add');
-    expect(result.callGraph.calculate).toContain('multiply');
+    expect(result.callGraph!.calculate).toBeDefined();
+    expect(result.callGraph!.calculate).toContain('add');
+    expect(result.callGraph!.calculate).toContain('multiply');
   });
 
   it('should handle parse errors gracefully', () => {
@@ -101,7 +101,7 @@ function test(name) {
     const result = analyzeFile(code, 'test.js');
 
     expect(result.functions).toHaveLength(1);
-    expect(result.functions[0].description).toContain('This is a test function');
+    expect(result.functions![0]!.description).toContain('This is a test function');
   });
 
   it('should handle arrow functions', () => {
@@ -126,7 +126,7 @@ function withDefaults(a, b = 10, c = 20) {
     const result = analyzeFile(code, 'defaults.js');
 
     expect(result.functions).toHaveLength(1);
-    expect(result.functions[0].params).toBe('a,b?,c?');
+    expect(result.functions![0]!.params).toBe('a,b?,c?');
   });
 
   it('should handle rest parameters', () => {
@@ -138,7 +138,7 @@ function withRest(first, ...rest) {
     const result = analyzeFile(code, 'rest.js');
 
     expect(result.functions).toHaveLength(1);
-    expect(result.functions[0].params).toBe('first,...rest');
+    expect(result.functions![0]!.params).toBe('first,...rest');
   });
 
   // ========== 边界测试用例 ==========
@@ -210,8 +210,8 @@ function 测试函数(参数一, 参数二) {
       const result = analyzeFile(code, 'unicode.js');
 
       expect(result.functions!).toHaveLength(1);
-      expect(result.functions![0].name).toBe('测试函数');
-      expect(result.functions![0].description).toContain('中文函数描述');
+      expect(result.functions![0]!.name).toBe('测试函数');
+      expect(result.functions![0]!.description).toContain('中文函数描述');
     });
 
     it('should handle emoji in code', () => {
@@ -223,7 +223,7 @@ function sendMessage(emoji = '👋') {
       const result = analyzeFile(code, 'emoji.js');
 
       expect(result.functions!).toHaveLength(1);
-      expect(result.functions![0].name).toBe('sendMessage');
+      expect(result.functions![0]!.name).toBe('sendMessage');
     });
 
     it('should handle deeply nested functions', () => {
@@ -254,7 +254,7 @@ function level1() {
       const result = analyzeFile(code, 'long.js');
 
       expect(result.functions!).toHaveLength(1);
-      expect(result.functions![0].name).toBe(codeName);
+      expect(result.functions![0]!.name).toBe(codeName);
     });
 
     it('should handle syntax error gracefully', () => {
@@ -342,8 +342,8 @@ class Child extends Middle {
       const result = analyzeFile(code, 'hierarchy.js');
 
       expect(result.classes!).toHaveLength(3);
-      expect(result.classes![1].superClass).toBe('Base');
-      expect(result.classes![2].superClass).toBe('Middle');
+      expect(result.classes![1]!.superClass).toBe('Base');
+      expect(result.classes![2]!.superClass).toBe('Middle');
     });
 
     it('should handle mixed import styles', () => {
@@ -370,7 +370,7 @@ function* generateNumbers() {
       const result = analyzeFile(code, 'generator.js');
 
       expect(result.functions!).toHaveLength(1);
-      expect(result.functions![0].name).toBe('generateNumbers');
+      expect(result.functions![0]!.name).toBe('generateNumbers');
     });
 
     it('should handle async functions', () => {
@@ -383,7 +383,7 @@ async function fetchData() {
       const result = analyzeFile(code, 'async.js');
 
       expect(result.functions!).toHaveLength(1);
-      expect(result.functions![0].name).toBe('fetchData');
+      expect(result.functions![0]!.name).toBe('fetchData');
     });
 
     it('should handle special method names', () => {
@@ -396,7 +396,7 @@ class Example {
       const result = analyzeFile(code, 'special.js');
 
       expect(result.classes!).toHaveLength(1);
-      expect(result.classes![0].methods.length).toBeGreaterThan(0);
+      expect(result.classes![0]!.methods.length).toBeGreaterThan(0);
     });
   });
 });

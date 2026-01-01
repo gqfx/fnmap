@@ -1,14 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { 
-  analyzeFile,
   generateHeader,
   removeExistingHeaders,
   generateAiMap,
   generateFileMermaid,
   generateProjectMermaid
-} from '../index';
-import fs from 'fs';
-import path from 'path';
+} from '../src/index';
 
 describe('generateHeader', () => {
   it('should generate AI comment header', () => {
@@ -196,7 +193,7 @@ describe('generateFileMermaid', () => {
     const mermaid = generateFileMermaid('test.js', info);
 
     expect(mermaid).toContain('flowchart TD');
-    expect(mermaid).toContain('subgraph id_test_46_js');
+    expect(mermaid).toContain('subgraph id_test["test"]');
     expect(mermaid).toContain('func1["func1"]');
     expect(mermaid).toContain('func2["func2"]');
     expect(mermaid).toContain('-->');
@@ -284,8 +281,8 @@ describe('generateProjectMermaid', () => {
     const mermaid = generateProjectMermaid('/project', allFilesInfo);
 
     expect(mermaid).toContain('flowchart TD');
-    expect(mermaid).toContain('subgraph id_file1_46_js');
-    expect(mermaid).toContain('subgraph id_file2_46_js');
+    expect(mermaid).toContain('subgraph id_file1["file1"]');
+    expect(mermaid).toContain('subgraph id_file2["file2"]');
   });
 
   it('should avoid ID collisions for similar filenames', () => {
@@ -306,7 +303,8 @@ describe('generateProjectMermaid', () => {
     // test.js -> test_46_js
     // test_js -> test_95_js
     const matches = mermaid.match(/subgraph (id_[^\s]+)/g);
+    expect(matches).not.toBeNull();
     expect(matches).toHaveLength(2);
-    expect(matches[0]).not.toEqual(matches[1]);
+    expect(matches![0]).not.toEqual(matches![1]);
   });
 });

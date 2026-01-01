@@ -3,24 +3,18 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import child_process from 'child_process';
+import { scanDirectory, getGitChangedFiles } from '../src/index';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 describe('Scanner & Git Integration', () => {
-  let scanDirectory: (dir: string, baseDir?: string) => string[];
-  let getGitChangedFiles: (dir: string, stagedOnly?: boolean) => string[];
   let execSyncSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
-    vi.resetModules(); // Reset cache to ensure fresh import with mocks
-
-    // Setup spy BEFORE importing index.js
-    execSyncSpy = vi.spyOn(child_process, 'execSync').mockImplementation(() => '') as any; // Cast to any to avoid strict definition issues with overload
-
-    // const module = await import('../index.js');
-    scanDirectory = require('../index').scanDirectory;
-    getGitChangedFiles = require('../index').getGitChangedFiles;
+    vi.resetModules();
+    // Setup spy BEFORE tests
+    execSyncSpy = vi.spyOn(child_process, 'execSync').mockImplementation(() => '') as any;
   });
 
   afterEach(() => {
@@ -31,12 +25,15 @@ describe('Scanner & Git Integration', () => {
 
   describe('scanDirectory', () => {
     it('should scan directory and find JS/TS files', () => {
+      // Restore execSync for this test since it doesn't need mocking
+      execSyncSpy.mockRestore();
       const files = scanDirectory(fixturesDir, fixturesDir);
       expect(files.length).toBeGreaterThan(0);
       expect(files.some(f => f.endsWith('.js'))).toBe(true);
     });
 
     it('should handle symlink loops gracefully', () => {
+      execSyncSpy.mockRestore();
       const loopDir = path.join(fixturesDir, 'loop-test');
       if (!fs.existsSync(loopDir)) fs.mkdirSync(loopDir, { recursive: true });
 
@@ -56,6 +53,7 @@ describe('Scanner & Git Integration', () => {
     });
 
     it('should handle permission errors gracefully', async () => {
+      execSyncSpy.mockRestore();
       const originalReaddir = fs.readdirSync;
       const spy = vi.spyOn(fs, 'readdirSync');
 

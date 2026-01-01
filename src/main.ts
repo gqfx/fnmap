@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import type { CLIOptions, FileInfoEntry } from './types';
 import { COLORS, DEFAULT_EXCLUDES } from './constants';
-import { logger, setupCLI, setQuietMode, program } from './cli';
+import { logger, setupCLI, setQuietMode } from './cli';
 import { loadConfig, mergeConfig } from './config';
 import { scanDirectory, getGitChangedFiles } from './scanner';
 import { processFile } from './processor';
@@ -13,7 +13,7 @@ import { generateAiMap, generateFileMermaid, generateProjectMermaid } from './ge
  */
 export function main(): void {
   // 配置并解析CLI
-  setupCLI();
+  const program = setupCLI();
   program.parse(process.argv);
 
   const options = program.opts<CLIOptions>();
