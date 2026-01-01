@@ -28,6 +28,12 @@ The \`.fnmap\` file provides a structured code index for quick navigation. Read 
 **Call Graph:** The \`→\` at the end of function/method lines indicates which functions are called (both local and imported), helping you understand code execution flow.
 
 **Note:** \`.fnmap\` files are auto-maintained by scripts and should not be manually updated.
+
+## Code Comment Guidelines
+
+1. Every global variable, function, class, and file module must have a **concise comment describing its purpose or functionality** - avoid describing anything else
+2. When updating code, always update related comments to reflect the changes
+3. Prefer encapsulating logic in functions rather than writing flat, sequential code
 `;
 
 /**
