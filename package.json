@@ -1,0 +1,42 @@
+{
+  "name": "fnmap",
+  "version": "0.1.0",
+  "description": "AI code indexing tool for analyzing JS/TS code structure and generating structured code maps",
+  "main": "index.js",
+  "bin": {
+    "fnmap": "./index.js"
+  },
+  "files": [
+    "index.js"
+  ],
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "esbuild index.js --bundle --platform=node --outfile=dist/index.bundle.js --minify"
+  },
+  "keywords": [
+    "ai",
+    "code-analysis",
+    "ast",
+    "javascript",
+    "typescript",
+    "code-index",
+    "code-map",
+    "fnmap"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "dependencies": {
+    "@babel/generator": "^7.28.5",
+    "@babel/parser": "^7.28.5",
+    "@babel/traverse": "^7.28.5",
+    "@babel/types": "^7.28.5",
+    "commander": "^14.0.2",
+    "prettier": "^3.7.4"
+  },
+  "devDependencies": {
+    "esbuild": "^0.27.2"
+  }
+}

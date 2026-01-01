@@ -1,0 +1,18 @@
+{
+  "enable": true,
+  "include": [
+    "src/**/*.js",
+    "src/**/*.ts",
+    "src/**/*.jsx",
+    "src/**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build",
+    ".next",
+    "coverage",
+    "__pycache__",
+    ".cache"
+  ]
+}
