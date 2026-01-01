@@ -17,13 +17,13 @@
 ## 安装
 
 ```bash
-npm install -g fnmap
+npm install -g @didnhdj/fnmap
 ```
 
 或在项目中使用：
 
 ```bash
-npm install --save-dev fnmap
+npm install --save-dev @didnhdj/fnmap
 ```
 
 ## 快速开始
@@ -187,7 +187,7 @@ git add .fnmap
 # .github/workflows/ci.yml
 - name: Generate Code Index
   run: |
-    npm install -g fnmap
+    npm install -g @didnhdj/fnmap
     fnmap --dir src
     git diff --exit-code .fnmap || echo "Code index updated"
 ```

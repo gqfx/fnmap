@@ -17,13 +17,13 @@
 ## Installation
 
 ```bash
-npm install -g fnmap
+npm install -g @didnhdj/fnmap
 ```
 
 Or use in your project:
 
 ```bash
-npm install --save-dev fnmap
+npm install --save-dev @didnhdj/fnmap
 ```
 
 ## Quick Start
@@ -187,7 +187,7 @@ This automatically updates the `.fnmap` index when committing code.
 # .github/workflows/ci.yml
 - name: Generate Code Index
   run: |
-    npm install -g fnmap
+    npm install -g @didnhdj/fnmap
     fnmap --dir src
     git diff --exit-code .fnmap || echo "Code index updated"
 ```
