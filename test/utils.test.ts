@@ -1,12 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { analyzeFile } from '../src/index';
+import type { FileInfo } from '../src/index';
 
 // 测试工具函数
 describe('Utility Functions', () => {
   describe('extractJSDocDescription', () => {
     it('should extract description from JSDoc comment', async () => {
        // const { analyzeFile } = await import('../index.js'); // Removed dynamic import
-      
+
       const code = `
 /**
  * This is a description
@@ -14,14 +15,15 @@ describe('Utility Functions', () => {
  */
 function test(name) {}
       `;
-      
+
       const result = analyzeFile(code, 'test.js');
-      expect(result.functions?.[0]?.description ?? '').toContain('This is a description');
+      const info = result as FileInfo;
+      expect(info.functions?.[0]?.description ?? '').toContain('This is a description');
     });
 
     it('should extract description from multi-line JSDoc', async () => {
       // const { analyzeFile } = await import('../index.js');
-      
+
       const code = `
 /**
  * First line of description
@@ -31,9 +33,10 @@ function test(name) {}
  */
 function calculate(x) { return x * 2; }
       `;
-      
+
       const result = analyzeFile(code, 'test.js');
-      expect(result.functions?.[0]?.description ?? '').toContain('First line');
+      const info = result as FileInfo;
+      expect(info.functions?.[0]?.description ?? '').toContain('First line');
     });
   });
 
@@ -42,7 +45,7 @@ function calculate(x) { return x * 2; }
       // const module = await import('../index.js');
       // removeExistingHeaders 需要被导出
       // 这里我们通过分析来间接测试
-      
+
       const code = `
 /*@AI test.js
 function info
@@ -52,11 +55,12 @@ function test() {
   return true;
 }
       `;
-      
+
       // 由于函数未导出，我们测试它的效果
       const result = analyzeFile(code, 'test.js');
-      expect(result.functions).toHaveLength(1);
-      expect(result.functions?.[0]?.name).toBe('test');
+      const info = result as FileInfo;
+      expect(info.functions).toHaveLength(1);
+      expect(info.functions?.[0]?.name).toBe('test');
     });
   });
 });

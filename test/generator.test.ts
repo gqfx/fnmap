@@ -1,15 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { 
+import {
   generateHeader,
   removeExistingHeaders,
   generateAiMap,
   generateFileMermaid,
   generateProjectMermaid
 } from '../src/index';
+import type { FileInfo, MethodInfo } from '../src/index';
 
 describe('generateHeader', () => {
   it('should generate AI comment header', () => {
-    const info = {
+    const info: FileInfo = {
       description: 'Test file',
       imports: [
         { module: 'fs', members: ['readFileSync', 'writeFileSync'], usedIn: ['readFile'] }
@@ -20,7 +21,8 @@ describe('generateHeader', () => {
       classes: [],
       constants: [
         { name: 'MAX_SIZE', line: 5, description: 'Maximum size' }
-      ]
+      ],
+      callGraph: {}
     };
 
     const header = generateHeader(info, 'test.js');
@@ -34,7 +36,7 @@ describe('generateHeader', () => {
   });
 
   it('should include class information', () => {
-    const info = {
+    const info: FileInfo = {
       description: '',
       imports: [],
       functions: [],
@@ -47,11 +49,12 @@ describe('generateHeader', () => {
           methods: [
             { name: 'method1', params: 'x', line: 15, static: false, kind: 'method', description: '' },
             { name: 'staticMethod', params: '', line: 20, static: true, kind: 'method', description: '' }
-          ],
+          ] as MethodInfo[],
           description: 'My class'
         }
       ],
-      constants: []
+      constants: [],
+      callGraph: {}
     };
 
     const header = generateHeader(info, 'class.js');
@@ -62,7 +65,7 @@ describe('generateHeader', () => {
   });
 
   it('should handle get and set methods', () => {
-    const info = {
+    const info: FileInfo = {
       description: '',
       imports: [],
       functions: [],
@@ -75,11 +78,12 @@ describe('generateHeader', () => {
           methods: [
             { name: 'value', params: '', line: 5, static: false, kind: 'get', description: '' },
             { name: 'value', params: 'v', line: 8, static: false, kind: 'set', description: '' }
-          ],
+          ] as MethodInfo[],
           description: ''
         }
       ],
-      constants: []
+      constants: [],
+      callGraph: {}
     };
 
     const header = generateHeader(info, 'getset.js');
@@ -179,12 +183,15 @@ describe('generateAiMap', () => {
 
 describe('generateFileMermaid', () => {
   it('should generate mermaid flowchart for a file', () => {
-    const info = {
+    const info: FileInfo = {
+      description: '',
+      imports: [],
       functions: [
         { name: 'func1', params: '', startLine: 1, endLine: 5, description: '' },
         { name: 'func2', params: '', startLine: 7, endLine: 10, description: '' }
       ],
       classes: [],
+      constants: [],
       callGraph: {
         func1: ['func2']
       }
@@ -200,9 +207,12 @@ describe('generateFileMermaid', () => {
   });
 
   it('should return null for files without functions', () => {
-    const info = {
+    const info: FileInfo = {
+      description: '',
+      imports: [],
       functions: [],
       classes: [],
+      constants: [],
       callGraph: {}
     };
 
@@ -212,7 +222,9 @@ describe('generateFileMermaid', () => {
   });
 
   it('should handle class methods', () => {
-    const info = {
+    const info: FileInfo = {
+      description: '',
+      imports: [],
       functions: [],
       classes: [
         {
@@ -224,9 +236,10 @@ describe('generateFileMermaid', () => {
           methods: [
             { name: 'method1', params: '', line: 5, static: false, kind: 'method', description: '' },
             { name: 'method2', params: '', line: 10, static: false, kind: 'method', description: '' }
-          ]
+          ] as MethodInfo[]
         }
       ],
+      constants: [],
       callGraph: {
         'MyClass.method1': ['MyClass.method2']
       }
@@ -240,11 +253,14 @@ describe('generateFileMermaid', () => {
   });
 
   it('should handle special characters in function names (escaping)', () => {
-    const info = {
+    const info: FileInfo = {
+      description: '',
+      imports: [],
       functions: [
         { name: 'func"with"quote', params: '', startLine: 1, endLine: 5, description: '' }
       ],
       classes: [],
+      constants: [],
       callGraph: {}
     };
 
@@ -263,18 +279,24 @@ describe('generateProjectMermaid', () => {
       {
         relativePath: 'file1.js',
         info: {
+          description: '',
+          imports: [],
           functions: [{ name: 'func1', params: '', startLine: 1, endLine: 5, description: '' }],
           classes: [],
+          constants: [],
           callGraph: {}
-        }
+        } as FileInfo
       },
       {
         relativePath: 'file2.js',
         info: {
+          description: '',
+          imports: [],
           functions: [{ name: 'func2', params: '', startLine: 1, endLine: 5, description: '' }],
           classes: [],
+          constants: [],
           callGraph: {}
-        }
+        } as FileInfo
       }
     ];
 
@@ -289,11 +311,25 @@ describe('generateProjectMermaid', () => {
     const allFilesInfo = [
       {
         relativePath: 'test.js',
-        info: { functions: [{ name: 'fn', params: '', startLine: 1, endLine: 1 }], classes: [], callGraph: {} }
+        info: {
+          description: '',
+          imports: [],
+          functions: [{ name: 'fn', params: '', startLine: 1, endLine: 1, description: '' }],
+          classes: [],
+          constants: [],
+          callGraph: {}
+        } as FileInfo
       },
       {
         relativePath: 'test_js', // No extension or different one
-        info: { functions: [{ name: 'fn', params: '', startLine: 1, endLine: 1 }], classes: [], callGraph: {} }
+        info: {
+          description: '',
+          imports: [],
+          functions: [{ name: 'fn', params: '', startLine: 1, endLine: 1, description: '' }],
+          classes: [],
+          constants: [],
+          callGraph: {}
+        } as FileInfo
       }
     ];
 

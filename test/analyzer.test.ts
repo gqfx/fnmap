@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { analyzeFile } from '../src/index';
-import fs from 'fs';
-import path from 'path';
+import { analyzeFile, isParseError } from '../src/index';
+import type { FileInfo, ParseErrorResult } from '../src/index';
+import * as fs from 'fs';
+import * as path from 'path';
 
 describe('analyzeFile', () => {
   it('should analyze a simple JavaScript file', () => {
@@ -9,18 +10,20 @@ describe('analyzeFile', () => {
     const result = analyzeFile(code, 'sample.js');
 
     expect(result).toBeDefined();
-    expect(result.parseError).toBeUndefined();
-    expect(result.functions!).toHaveLength(3);
-    expect(result.functions![0]!.name).toBe('add');
-    expect(result.functions![0]!.params).toBe('a,b');
-    expect(result.functions![0]!.description).toContain('Add two numbers');
+    expect(isParseError(result)).toBe(false);
+    const info = result as FileInfo;
+    expect(info.functions).toHaveLength(3);
+    expect(info.functions[0]!.name).toBe('add');
+    expect(info.functions[0]!.params).toBe('a,b');
+    expect(info.functions[0]!.description).toContain('Add two numbers');
   });
 
   it('should extract function parameters correctly', () => {
     const code = fs.readFileSync(path.join(__dirname, 'fixtures/sample.js'), 'utf-8');
     const result = analyzeFile(code, 'sample.js');
 
-    const calculateFn = result.functions!.find(f => f.name === 'calculate');
+    const info = result as FileInfo;
+    const calculateFn = info.functions.find(f => f.name === 'calculate');
     expect(calculateFn).toBeDefined();
     expect(calculateFn!.params).toBe('x,y,z');
   });
@@ -29,16 +32,18 @@ describe('analyzeFile', () => {
     const code = fs.readFileSync(path.join(__dirname, 'fixtures/sample.js'), 'utf-8');
     const result = analyzeFile(code, 'sample.js');
 
-    expect(result.constants).toHaveLength(1);
-    expect(result.constants![0]!.name).toBe('MAX_SIZE');
+    const info = result as FileInfo;
+    expect(info.constants).toHaveLength(1);
+    expect(info.constants[0]!.name).toBe('MAX_SIZE');
   });
 
   it('should parse imports', () => {
     const code = fs.readFileSync(path.join(__dirname, 'fixtures/sample.js'), 'utf-8');
     const result = analyzeFile(code, 'sample.js');
 
-    expect(result.imports).toHaveLength(2);
-    const fsImport = result.imports!.find(imp => imp.module === 'fs');
+    const info = result as FileInfo;
+    expect(info.imports).toHaveLength(2);
+    const fsImport = info.imports.find(imp => imp.module === 'fs');
     expect(fsImport).toBeDefined();
     expect(fsImport!.members).toContain('fs');
   });
@@ -48,21 +53,23 @@ describe('analyzeFile', () => {
     const result = analyzeFile(code, 'sample.ts');
 
     expect(result).toBeDefined();
-    expect(result.parseError).toBeUndefined();
-    expect(result.classes).toHaveLength(1);
-    expect(result.classes![0]!.name).toBe('UserManager');
+    expect(isParseError(result)).toBe(false);
+    const info = result as FileInfo;
+    expect(info.classes).toHaveLength(1);
+    expect(info.classes[0]!.name).toBe('UserManager');
   });
 
   it('should extract class methods', () => {
     const code = fs.readFileSync(path.join(__dirname, 'fixtures/sample-class.js'), 'utf-8');
     const result = analyzeFile(code, 'sample-class.js');
 
-    expect(result.classes).toHaveLength(1);
-    const myClass = result.classes![0];
+    const info = result as FileInfo;
+    expect(info.classes).toHaveLength(1);
+    const myClass = info.classes[0];
     expect(myClass!.name).toBe('MyClass');
     expect(myClass!.superClass).toBe('EventEmitter');
     expect(myClass!.methods).toHaveLength(4); // constructor, increment, getCount, create
-    
+
     const staticMethod = myClass!.methods.find(m => m.name === 'create');
     expect(staticMethod).toBeDefined();
     expect(staticMethod!.static).toBe(true);
@@ -72,18 +79,21 @@ describe('analyzeFile', () => {
     const code = fs.readFileSync(path.join(__dirname, 'fixtures/sample.js'), 'utf-8');
     const result = analyzeFile(code, 'sample.js');
 
-    expect(result.callGraph).toBeDefined();
-    expect(result.callGraph!.calculate).toBeDefined();
-    expect(result.callGraph!.calculate).toContain('add');
-    expect(result.callGraph!.calculate).toContain('multiply');
+    const info = result as FileInfo;
+    expect(info.callGraph).toBeDefined();
+    expect(info.callGraph.calculate).toBeDefined();
+    expect(info.callGraph.calculate).toContain('add');
+    expect(info.callGraph.calculate).toContain('multiply');
   });
 
   it('should handle parse errors gracefully', () => {
     const code = fs.readFileSync(path.join(__dirname, 'fixtures/sample-error.js'), 'utf-8');
     const result = analyzeFile(code, 'sample-error.js');
 
-    expect(result.parseError).toBeDefined();
-    expect(result.loc).toBeDefined();
+    expect(isParseError(result)).toBe(true);
+    const err = result as ParseErrorResult;
+    expect(err.parseError).toBeDefined();
+    expect(err.loc).toBeDefined();
   });
 
   it('should extract JSDoc descriptions', () => {
@@ -100,8 +110,9 @@ function test(name) {
     `;
     const result = analyzeFile(code, 'test.js');
 
-    expect(result.functions).toHaveLength(1);
-    expect(result.functions![0]!.description).toContain('This is a test function');
+    const info = result as FileInfo;
+    expect(info.functions).toHaveLength(1);
+    expect(info.functions[0]!.description).toContain('This is a test function');
   });
 
   it('should handle arrow functions', () => {
@@ -114,7 +125,7 @@ const arrowBlock = (a, b) => {
     const result = analyzeFile(code, 'arrow.js');
 
     expect(result).toBeDefined();
-    expect(result.parseError).toBeUndefined();
+    expect(isParseError(result)).toBe(false);
   });
 
   it('should handle default parameters', () => {
@@ -125,8 +136,9 @@ function withDefaults(a, b = 10, c = 20) {
     `;
     const result = analyzeFile(code, 'defaults.js');
 
-    expect(result.functions).toHaveLength(1);
-    expect(result.functions![0]!.params).toBe('a,b?,c?');
+    const info = result as FileInfo;
+    expect(info.functions).toHaveLength(1);
+    expect(info.functions[0]!.params).toBe('a,b?,c?');
   });
 
   it('should handle rest parameters', () => {
@@ -137,8 +149,9 @@ function withRest(first, ...rest) {
     `;
     const result = analyzeFile(code, 'rest.js');
 
-    expect(result.functions).toHaveLength(1);
-    expect(result.functions![0]!.params).toBe('first,...rest');
+    const info = result as FileInfo;
+    expect(info.functions).toHaveLength(1);
+    expect(info.functions[0]!.params).toBe('first,...rest');
   });
 
   // ========== 边界测试用例 ==========
@@ -147,55 +160,63 @@ function withRest(first, ...rest) {
     it('should handle null code', () => {
       const result = analyzeFile(null, 'test.js');
 
-      expect(result.parseError).toBeDefined();
-      expect(result.errorType).toBe('VALIDATION_ERROR');
+      expect(isParseError(result)).toBe(true);
+      const err = result as ParseErrorResult;
+      expect(err.parseError).toBeDefined();
+      expect(err.errorType).toBe('VALIDATION_ERROR');
     });
 
     it('should handle undefined code', () => {
       const result = analyzeFile(undefined, 'test.js');
 
-      expect(result.parseError).toBeDefined();
-      expect(result.errorType).toBe('VALIDATION_ERROR');
+      expect(isParseError(result)).toBe(true);
+      const err = result as ParseErrorResult;
+      expect(err.parseError).toBeDefined();
+      expect(err.errorType).toBe('VALIDATION_ERROR');
     });
 
     it('should handle non-string code', () => {
-      // @ts-ignore
-    const result = analyzeFile(123 as any, 'test.js');
+      const result = analyzeFile(123 as unknown, 'test.js');
 
-      expect(result.parseError).toBeDefined();
-      expect(result.errorType).toBe('VALIDATION_ERROR');
+      expect(isParseError(result)).toBe(true);
+      const err = result as ParseErrorResult;
+      expect(err.parseError).toBeDefined();
+      expect(err.errorType).toBe('VALIDATION_ERROR');
     });
 
     it('should handle empty file', () => {
       const code = '';
       const result = analyzeFile(code, 'empty.js');
 
-      expect(result.functions).toEqual([]);
-      expect(result.classes).toEqual([]);
-      expect(result.imports).toEqual([]);
-      expect(result.constants).toEqual([]);
+      const info = result as FileInfo;
+      expect(info.functions).toEqual([]);
+      expect(info.classes).toEqual([]);
+      expect(info.imports).toEqual([]);
+      expect(info.constants).toEqual([]);
     });
 
     it('should handle file with only whitespace', () => {
       const code = '   \n\t  \r\n  ';
       const result = analyzeFile(code, 'whitespace.js');
 
-      expect(result.functions).toEqual([]);
-      expect(result.classes).toEqual([]);
+      const info = result as FileInfo;
+      expect(info.functions).toEqual([]);
+      expect(info.classes).toEqual([]);
     });
 
     it('should handle file with only comments', () => {
       const code = `
 // This is a comment
-/* 
+/*
  * Multi-line comment
  */
 /** JSDoc comment */
       `;
       const result = analyzeFile(code, 'comments.js');
 
-      expect(result.functions).toEqual([]);
-      expect(result.classes).toEqual([]);
+      const info = result as FileInfo;
+      expect(info.functions).toEqual([]);
+      expect(info.classes).toEqual([]);
     });
 
     it('should handle Unicode characters in code', () => {
@@ -209,9 +230,10 @@ function 测试函数(参数一, 参数二) {
       `;
       const result = analyzeFile(code, 'unicode.js');
 
-      expect(result.functions!).toHaveLength(1);
-      expect(result.functions![0]!.name).toBe('测试函数');
-      expect(result.functions![0]!.description).toContain('中文函数描述');
+      const info = result as FileInfo;
+      expect(info.functions).toHaveLength(1);
+      expect(info.functions[0]!.name).toBe('测试函数');
+      expect(info.functions[0]!.description).toContain('中文函数描述');
     });
 
     it('should handle emoji in code', () => {
@@ -222,8 +244,9 @@ function sendMessage(emoji = '👋') {
       `;
       const result = analyzeFile(code, 'emoji.js');
 
-      expect(result.functions!).toHaveLength(1);
-      expect(result.functions![0]!.name).toBe('sendMessage');
+      const info = result as FileInfo;
+      expect(info.functions).toHaveLength(1);
+      expect(info.functions[0]!.name).toBe('sendMessage');
     });
 
     it('should handle deeply nested functions', () => {
@@ -243,9 +266,10 @@ function level1() {
       `;
       const result = analyzeFile(code, 'nested.js');
 
+      const info = result as FileInfo;
       // Babel's FunctionDeclaration visitor captures all function declarations
-      expect(result.functions!.length).toBeGreaterThan(0);
-      expect(result.functions!.some(f => f.name === 'level1')).toBe(true);
+      expect(info.functions.length).toBeGreaterThan(0);
+      expect(info.functions.some(f => f.name === 'level1')).toBe(true);
     });
 
     it('should handle very long function names', () => {
@@ -253,8 +277,9 @@ function level1() {
       const code = `function ${codeName}() { return true; }`;
       const result = analyzeFile(code, 'long.js');
 
-      expect(result.functions!).toHaveLength(1);
-      expect(result.functions![0]!.name).toBe(codeName);
+      const info = result as FileInfo;
+      expect(info.functions).toHaveLength(1);
+      expect(info.functions[0]!.name).toBe(codeName);
     });
 
     it('should handle syntax error gracefully', () => {
@@ -265,9 +290,11 @@ function broken( {
       `;
       const result = analyzeFile(code, 'error.js');
 
-      expect(result.parseError).toBeDefined();
-      expect(result.errorType).toBe('PARSE_ERROR');
-      expect(result.loc).toBeDefined();
+      expect(isParseError(result)).toBe(true);
+      const err = result as ParseErrorResult;
+      expect(err.parseError).toBeDefined();
+      expect(err.errorType).toBe('PARSE_ERROR');
+      expect(err.loc).toBeDefined();
     });
 
     it('should handle modern JavaScript syntax', () => {
@@ -281,8 +308,9 @@ function process(config) {
       `;
       const result = analyzeFile(code, 'modern.js');
 
-      expect(result.parseError).toBeUndefined();
-      expect(result.functions!).toHaveLength(1);
+      expect(isParseError(result)).toBe(false);
+      const info = result as FileInfo;
+      expect(info.functions).toHaveLength(1);
     });
 
     it('should handle TypeScript without filePath extension', () => {
@@ -311,9 +339,10 @@ function funcB() {
       `;
       const result = analyzeFile(code, 'circular.js');
 
-      expect(result.functions!).toHaveLength(2);
-      expect(result.callGraph!.funcA).toContain('funcB');
-      expect(result.callGraph!.funcB).toContain('funcA');
+      const info = result as FileInfo;
+      expect(info.functions).toHaveLength(2);
+      expect(info.callGraph.funcA).toContain('funcB');
+      expect(info.callGraph.funcB).toContain('funcA');
     });
 
     it('should handle large file with many functions', () => {
@@ -323,7 +352,8 @@ function funcB() {
       }
       const result = analyzeFile(code, 'large.js');
 
-      expect(result.functions!).toHaveLength(100);
+      const info = result as FileInfo;
+      expect(info.functions).toHaveLength(100);
     });
 
     it('should handle complex class hierarchy', () => {
@@ -341,9 +371,10 @@ class Child extends Middle {
       `;
       const result = analyzeFile(code, 'hierarchy.js');
 
-      expect(result.classes!).toHaveLength(3);
-      expect(result.classes![1]!.superClass).toBe('Base');
-      expect(result.classes![2]!.superClass).toBe('Middle');
+      const info = result as FileInfo;
+      expect(info.classes).toHaveLength(3);
+      expect(info.classes[1]!.superClass).toBe('Base');
+      expect(info.classes[2]!.superClass).toBe('Middle');
     });
 
     it('should handle mixed import styles', () => {
@@ -356,7 +387,8 @@ const { destructured } = require('module5');
       `;
       const result = analyzeFile(code, 'imports.js');
 
-      expect(result.imports!.length).toBeGreaterThan(0);
+      const info = result as FileInfo;
+      expect(info.imports.length).toBeGreaterThan(0);
     });
 
     it('should handle generator functions', () => {
@@ -369,8 +401,9 @@ function* generateNumbers() {
       `;
       const result = analyzeFile(code, 'generator.js');
 
-      expect(result.functions!).toHaveLength(1);
-      expect(result.functions![0]!.name).toBe('generateNumbers');
+      const info = result as FileInfo;
+      expect(info.functions).toHaveLength(1);
+      expect(info.functions[0]!.name).toBe('generateNumbers');
     });
 
     it('should handle async functions', () => {
@@ -382,8 +415,9 @@ async function fetchData() {
       `;
       const result = analyzeFile(code, 'async.js');
 
-      expect(result.functions!).toHaveLength(1);
-      expect(result.functions![0]!.name).toBe('fetchData');
+      const info = result as FileInfo;
+      expect(info.functions).toHaveLength(1);
+      expect(info.functions[0]!.name).toBe('fetchData');
     });
 
     it('should handle special method names', () => {
@@ -395,8 +429,9 @@ class Example {
       `;
       const result = analyzeFile(code, 'special.js');
 
-      expect(result.classes!).toHaveLength(1);
-      expect(result.classes![0]!.methods.length).toBeGreaterThan(0);
+      const info = result as FileInfo;
+      expect(info.classes).toHaveLength(1);
+      expect(info.classes[0]!.methods.length).toBeGreaterThan(0);
     });
   });
 });
