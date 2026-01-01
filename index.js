@@ -32,6 +32,136 @@ const COLORS = {
   bold: '\x1b[1m'
 };
 
+// 错误类型枚举
+const ErrorTypes = {
+  FILE_NOT_FOUND: 'FILE_NOT_FOUND',
+  FILE_READ_ERROR: 'FILE_READ_ERROR',
+  PARSE_ERROR: 'PARSE_ERROR',
+  CONFIG_ERROR: 'CONFIG_ERROR',
+  VALIDATION_ERROR: 'VALIDATION_ERROR',
+  PERMISSION_ERROR: 'PERMISSION_ERROR',
+  FILE_TOO_LARGE: 'FILE_TOO_LARGE'
+};
+
+// 文件大小限制 (10MB)
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+// 最大目录深度限制
+const MAX_DIR_DEPTH = 50;
+
+/**
+ * 验证文件路径
+ * @param {string} filePath 文件路径
+ * @returns {{valid: boolean, error?: string, errorType?: string}}
+ */
+function validateFilePath(filePath) {
+  if (!filePath || typeof filePath !== 'string') {
+    return {
+      valid: false,
+      error: 'File path is required and must be a string / 文件路径必须是字符串',
+      errorType: ErrorTypes.VALIDATION_ERROR
+    };
+  }
+
+  if (!fs.existsSync(filePath)) {
+    return {
+      valid: false,
+      error: `File not found: ${filePath} / 文件不存在: ${filePath}`,
+      errorType: ErrorTypes.FILE_NOT_FOUND
+    };
+  }
+
+  try {
+    const stats = fs.statSync(filePath);
+
+    if (!stats.isFile()) {
+      return {
+        valid: false,
+        error: `Path is not a file: ${filePath} / 路径不是文件: ${filePath}`,
+        errorType: ErrorTypes.VALIDATION_ERROR
+      };
+    }
+
+    if (stats.size > MAX_FILE_SIZE) {
+      return {
+        valid: false,
+        error: `File too large (${(stats.size / 1024 / 1024).toFixed(2)}MB > ${MAX_FILE_SIZE / 1024 / 1024}MB): ${filePath} / 文件过大`,
+        errorType: ErrorTypes.FILE_TOO_LARGE
+      };
+    }
+  } catch (e) {
+    return {
+      valid: false,
+      error: `Cannot access file: ${filePath}. Reason: ${e.message} / 无法访问文件`,
+      errorType: ErrorTypes.PERMISSION_ERROR
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * 验证配置对象
+ * @param {object} config 配置对象
+ * @returns {{valid: boolean, error?: string}}
+ */
+function validateConfig(config) {
+  if (!config || typeof config !== 'object') {
+    return {
+      valid: false,
+      error: 'Config must be an object / 配置必须是对象'
+    };
+  }
+
+  if (config.enable !== undefined && typeof config.enable !== 'boolean') {
+    return {
+      valid: false,
+      error: 'Config.enable must be a boolean / enable 字段必须是布尔值'
+    };
+  }
+
+  if (config.include !== undefined && !Array.isArray(config.include)) {
+    return {
+      valid: false,
+      error: 'Config.include must be an array / include 字段必须是数组'
+    };
+  }
+
+  if (config.exclude !== undefined && !Array.isArray(config.exclude)) {
+    return {
+      valid: false,
+      error: 'Config.exclude must be an array / exclude 字段必须是数组'
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * 格式化错误信息
+ * @param {string} errorType 错误类型
+ * @param {string} message 错误消息
+ * @param {object} context 上下文信息
+ * @returns {string}
+ */
+function formatError(errorType, message, context = {}) {
+  const parts = [message];
+
+  if (context.file) {
+    parts.push(`File: ${context.file}`);
+  }
+
+  if (context.line !== undefined && context.column !== undefined) {
+    parts.push(`Location: Line ${context.line}, Column ${context.column}`);
+  }
+
+  if (context.suggestion) {
+    parts.push(`Suggestion: ${context.suggestion}`);
+  }
+
+  return parts.join('\n  ');
+}
+
 // 日志工具
 let quietMode = false;
 const logger = {
@@ -67,10 +197,49 @@ function loadConfig(projectDir) {
     if (fs.existsSync(configPath)) {
       try {
         const content = fs.readFileSync(configPath, 'utf-8');
-        const config = JSON.parse(content);
+
+        // 检查是否为空文件
+        if (!content.trim()) {
+          logger.warn(`Config file is empty: ${file}. Using default config / 配置文件为空,使用默认配置`);
+          continue;
+        }
+
+        let config;
+        try {
+          config = JSON.parse(content);
+        } catch (parseError) {
+          const errorMsg = formatError(
+            ErrorTypes.CONFIG_ERROR,
+            `Failed to parse config file: ${file} / 配置文件解析失败`,
+            {
+              file: configPath,
+              line: parseError.lineNumber,
+              column: parseError.columnNumber,
+              suggestion: 'Check JSON syntax, ensure proper quotes and commas / 检查 JSON 语法,确保引号和逗号正确'
+            }
+          );
+          logger.warn(errorMsg);
+          continue;
+        }
+
+        // 验证配置
+        const validation = validateConfig(config);
+        if (!validation.valid) {
+          logger.warn(`Invalid config in ${file}: ${validation.error}`);
+          continue;
+        }
+
         return { config, source: file };
       } catch (e) {
-        logger.warn(`Failed to parse config file ${file}: ${e.message}`);
+        const errorMsg = formatError(
+          ErrorTypes.FILE_READ_ERROR,
+          `Failed to read config file: ${file} / 配置文件读取失败`,
+          {
+            file: configPath,
+            suggestion: e.message
+          }
+        );
+        logger.warn(errorMsg);
       }
     }
   }
@@ -81,10 +250,15 @@ function loadConfig(projectDir) {
     try {
       const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
       if (pkg.fnmap) {
-        return { config: pkg.fnmap, source: 'package.json#fnmap' };
+        const validation = validateConfig(pkg.fnmap);
+        if (!validation.valid) {
+          logger.warn(`Invalid fnmap config in package.json: ${validation.error}`);
+        } else {
+          return { config: pkg.fnmap, source: 'package.json#fnmap' };
+        }
       }
     } catch (e) {
-      // ignore
+      // ignore package.json parse errors
     }
   }
 
@@ -225,26 +399,68 @@ function getGitChangedFiles(projectDir, stagedOnly = false) {
  * @param {string} dir 目录路径
  * @param {string} baseDir 基准目录
  * @param {string[]} excludes 排除的目录列表
+ * @param {number} depth 当前深度
+ * @param {Set} visited 已访问的路径集合,用于检测符号链接循环
  */
-function scanDirectory(dir, baseDir = dir, excludes = DEFAULT_EXCLUDES) {
+function scanDirectory(dir, baseDir = dir, excludes = DEFAULT_EXCLUDES, depth = 0, visited = new Set()) {
   const files = [];
 
-  if (!fs.existsSync(dir)) return files;
+  if (!fs.existsSync(dir)) {
+    logger.warn(`Directory does not exist: ${dir} / 目录不存在`);
+    return files;
+  }
 
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  // 检查深度限制
+  if (depth > MAX_DIR_DEPTH) {
+    logger.warn(`Max directory depth (${MAX_DIR_DEPTH}) exceeded: ${dir} / 超过最大目录深度`);
+    return files;
+  }
+
+  // 获取规范化的真实路径,处理符号链接
+  let realPath;
+  try {
+    realPath = fs.realpathSync(dir);
+  } catch (e) {
+    logger.warn(`Cannot resolve real path: ${dir}. Reason: ${e.message} / 无法解析真实路径`);
+    return files;
+  }
+
+  // 检测循环引用
+  if (visited.has(realPath)) {
+    logger.warn(`Circular reference detected, skipping: ${dir} / 检测到循环引用`);
+    return files;
+  }
+  visited.add(realPath);
+
+  let entries;
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch (e) {
+    if (e.code === 'EACCES' || e.code === 'EPERM') {
+      logger.warn(`Permission denied: ${dir} / 权限不足`);
+    } else {
+      logger.warn(`Failed to read directory: ${dir}. Reason: ${e.message} / 读取目录失败`);
+    }
+    return files;
+  }
 
   for (const entry of entries) {
-    const fullPath = path.join(dir, entry.name);
+    try {
+      const fullPath = path.join(dir, entry.name);
 
-    if (entry.isDirectory()) {
-      if (!excludes.includes(entry.name)) {
-        files.push(...scanDirectory(fullPath, baseDir, excludes));
+      if (entry.isDirectory()) {
+        if (!excludes.includes(entry.name)) {
+          files.push(...scanDirectory(fullPath, baseDir, excludes, depth + 1, visited));
+        }
+      } else if (entry.isFile()) {
+        const ext = path.extname(entry.name);
+        if (SUPPORTED_EXTENSIONS.includes(ext)) {
+          files.push(path.relative(baseDir, fullPath));
+        }
       }
-    } else if (entry.isFile()) {
-      const ext = path.extname(entry.name);
-      if (SUPPORTED_EXTENSIONS.includes(ext)) {
-        files.push(path.relative(baseDir, fullPath));
-      }
+      // 忽略符号链接、设备文件等其他类型
+    } catch (e) {
+      logger.warn(`Error processing entry: ${entry.name}. Reason: ${e.message} / 处理条目出错`);
     }
   }
 
@@ -280,9 +496,36 @@ function extractJSDocDescription(comment) {
 }
 
 /**
- * 分析JS/TS文件，提取结构信息
+ * 分析JS/TS文件,提取结构信息
  */
 function analyzeFile(code, filePath) {
+  // 输入验证
+  if (code === null || code === undefined) {
+    return {
+      parseError: 'Code content is null or undefined / 代码内容为空',
+      errorType: ErrorTypes.VALIDATION_ERROR
+    };
+  }
+
+  if (typeof code !== 'string') {
+    return {
+      parseError: 'Code must be a string / 代码必须是字符串类型',
+      errorType: ErrorTypes.VALIDATION_ERROR
+    };
+  }
+
+  // 检查空文件
+  if (!code.trim()) {
+    return {
+      description: '',
+      imports: [],
+      functions: [],
+      classes: [],
+      constants: [],
+      callGraph: {}
+    };
+  }
+
   const info = {
     description: '',
     imports: [],
@@ -313,7 +556,7 @@ function analyzeFile(code, filePath) {
 
   let ast;
   try {
-    const isTS = filePath.endsWith('.ts') || filePath.endsWith('.tsx');
+    const isTS = filePath && (filePath.endsWith('.ts') || filePath.endsWith('.tsx'));
     ast = parser.parse(code, {
       sourceType: 'unambiguous',
       plugins: [
@@ -324,8 +567,22 @@ function analyzeFile(code, filePath) {
       ]
     });
   } catch (e) {
-    // 解析失败，返回错误信息
-    return { parseError: e.message, loc: e.loc };
+    // 解析失败,返回详细错误信息
+    const errorMsg = formatError(
+      ErrorTypes.PARSE_ERROR,
+      `Syntax error: ${e.message} / 语法错误`,
+      {
+        file: filePath,
+        line: e.loc?.line,
+        column: e.loc?.column,
+        suggestion: 'Check syntax errors in the file / 检查文件中的语法错误'
+      }
+    );
+    return {
+      parseError: errorMsg,
+      loc: e.loc,
+      errorType: ErrorTypes.PARSE_ERROR
+    };
   }
 
   // 收集导入信息
@@ -890,11 +1147,17 @@ function generateProjectMermaid(projectDir, allFilesInfo) {
 // ============== 文件处理 ==============
 
 /**
- * 处理单个文件（只分析，不修改文件）
+ * 处理单个文件(只分析,不修改文件)
  */
 function processFile(filePath, options) {
-  if (!fs.existsSync(filePath)) {
-    return { success: false, error: 'not found' };
+  // 使用验证函数
+  const validation = validateFilePath(filePath);
+  if (!validation.valid) {
+    return {
+      success: false,
+      error: validation.error,
+      errorType: validation.errorType
+    };
   }
 
   try {
@@ -902,18 +1165,39 @@ function processFile(filePath, options) {
     const info = analyzeFile(code, filePath);
 
     if (!info) {
-      return { success: false, error: 'parse failed' };
+      return {
+        success: false,
+        error: 'Analysis returned null / 分析返回空值',
+        errorType: ErrorTypes.PARSE_ERROR
+      };
     }
 
     // 检查是否有解析错误
     if (info.parseError) {
-      const loc = info.loc ? ` (行 ${info.loc.line}, 列 ${info.loc.column})` : '';
-      return { success: false, error: `parse failed${loc}: ${info.parseError}` };
+      return {
+        success: false,
+        error: info.parseError,
+        errorType: info.errorType || ErrorTypes.PARSE_ERROR,
+        loc: info.loc
+      };
     }
 
     return { success: true, info };
   } catch (e) {
-    return { success: false, error: e.message };
+    // 捕获文件读取错误
+    const errorMsg = formatError(
+      ErrorTypes.FILE_READ_ERROR,
+      `Failed to read or process file / 读取或处理文件失败`,
+      {
+        file: filePath,
+        suggestion: e.message
+      }
+    );
+    return {
+      success: false,
+      error: errorMsg,
+      errorType: ErrorTypes.FILE_READ_ERROR
+    };
   }
 }
 
@@ -1108,7 +1392,11 @@ module.exports = {
   getGitChangedFiles,
   extractJSDocDescription,
   loadConfig,
-  mergeConfig
+  mergeConfig,
+  validateFilePath,
+  validateConfig,
+  formatError,
+  ErrorTypes
 };
 
 // 直接运行

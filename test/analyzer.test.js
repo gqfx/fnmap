@@ -140,4 +140,262 @@ function withRest(first, ...rest) {
     expect(result.functions).toHaveLength(1);
     expect(result.functions[0].params).toBe('first,...rest');
   });
+
+  // ========== 边界测试用例 ==========
+
+  describe('Boundary Cases', () => {
+    it('should handle null code', () => {
+      const result = analyzeFile(null, 'test.js');
+
+      expect(result.parseError).toBeDefined();
+      expect(result.errorType).toBe('VALIDATION_ERROR');
+    });
+
+    it('should handle undefined code', () => {
+      const result = analyzeFile(undefined, 'test.js');
+
+      expect(result.parseError).toBeDefined();
+      expect(result.errorType).toBe('VALIDATION_ERROR');
+    });
+
+    it('should handle non-string code', () => {
+      const result = analyzeFile(123, 'test.js');
+
+      expect(result.parseError).toBeDefined();
+      expect(result.errorType).toBe('VALIDATION_ERROR');
+    });
+
+    it('should handle empty file', () => {
+      const code = '';
+      const result = analyzeFile(code, 'empty.js');
+
+      expect(result.functions).toEqual([]);
+      expect(result.classes).toEqual([]);
+      expect(result.imports).toEqual([]);
+      expect(result.constants).toEqual([]);
+    });
+
+    it('should handle file with only whitespace', () => {
+      const code = '   \n\t  \r\n  ';
+      const result = analyzeFile(code, 'whitespace.js');
+
+      expect(result.functions).toEqual([]);
+      expect(result.classes).toEqual([]);
+    });
+
+    it('should handle file with only comments', () => {
+      const code = `
+// This is a comment
+/* 
+ * Multi-line comment
+ */
+/** JSDoc comment */
+      `;
+      const result = analyzeFile(code, 'comments.js');
+
+      expect(result.functions).toEqual([]);
+      expect(result.classes).toEqual([]);
+    });
+
+    it('should handle Unicode characters in code', () => {
+      const code = `
+/**
+ * 中文函数描述 🎉
+ */
+function 测试函数(参数一, 参数二) {
+  return '中文字符串';
+}
+      `;
+      const result = analyzeFile(code, 'unicode.js');
+
+      expect(result.functions).toHaveLength(1);
+      expect(result.functions[0].name).toBe('测试函数');
+      expect(result.functions[0].description).toContain('中文函数描述');
+    });
+
+    it('should handle emoji in code', () => {
+      const code = `
+function sendMessage(emoji = '👋') {
+  return '🚀' + emoji;
+}
+      `;
+      const result = analyzeFile(code, 'emoji.js');
+
+      expect(result.functions).toHaveLength(1);
+      expect(result.functions[0].name).toBe('sendMessage');
+    });
+
+    it('should handle deeply nested functions', () => {
+      const code = `
+function level1() {
+  function level2() {
+    function level3() {
+      function level4() {
+        return 'deep';
+      }
+      return level4();
+    }
+    return level3();
+  }
+  return level2();
+}
+      `;
+      const result = analyzeFile(code, 'nested.js');
+
+      // Babel's FunctionDeclaration visitor captures all function declarations
+      expect(result.functions.length).toBeGreaterThan(0);
+      expect(result.functions.some(f => f.name === 'level1')).toBe(true);
+    });
+
+    it('should handle very long function names', () => {
+      const codeName = 'a'.repeat(500);
+      const code = `function ${codeName}() { return true; }`;
+      const result = analyzeFile(code, 'long.js');
+
+      expect(result.functions).toHaveLength(1);
+      expect(result.functions[0].name).toBe(codeName);
+    });
+
+    it('should handle syntax error gracefully', () => {
+      const code = `
+function broken( {
+  return "unclosed bracket";
+}
+      `;
+      const result = analyzeFile(code, 'error.js');
+
+      expect(result.parseError).toBeDefined();
+      expect(result.errorType).toBe('PARSE_ERROR');
+      expect(result.loc).toBeDefined();
+    });
+
+    it('should handle modern JavaScript syntax', () => {
+      const code = `
+const obj = { a: 1 };
+const copy = { ...obj };
+const value = obj?.a ?? 'default';
+function process(config) {
+  return config?.settings?.['theme'] ?? 'light';
+}
+      `;
+      const result = analyzeFile(code, 'modern.js');
+
+      expect(result.parseError).toBeUndefined();
+      expect(result.functions).toHaveLength(1);
+    });
+
+    it('should handle TypeScript without filePath extension', () => {
+      const code = `
+interface User {
+  name: string;
+}
+function getUser(): User {
+  return { name: 'test' };
+}
+      `;
+      const result = analyzeFile(code, null); // No file path
+
+      // Should still try to parse
+      expect(result).toBeDefined();
+    });
+
+    it('should handle circular call graph', () => {
+      const code = `
+function funcA() {
+  funcB();
+}
+function funcB() {
+  funcA();
+}
+      `;
+      const result = analyzeFile(code, 'circular.js');
+
+      expect(result.functions).toHaveLength(2);
+      expect(result.callGraph.funcA).toContain('funcB');
+      expect(result.callGraph.funcB).toContain('funcA');
+    });
+
+    it('should handle large file with many functions', () => {
+      let code = '';
+      for (let i = 0; i < 100; i++) {
+        code += `function func${i}() { return ${i}; }\n`;
+      }
+      const result = analyzeFile(code, 'large.js');
+
+      expect(result.functions).toHaveLength(100);
+    });
+
+    it('should handle complex class hierarchy', () => {
+      const code = `
+class Base {
+  constructor() {}
+  baseMethod() {}
+}
+class Middle extends Base {
+  middleMethod() {}
+}
+class Child extends Middle {
+  childMethod() {}
+}
+      `;
+      const result = analyzeFile(code, 'hierarchy.js');
+
+      expect(result.classes).toHaveLength(3);
+      expect(result.classes[1].superClass).toBe('Base');
+      expect(result.classes[2].superClass).toBe('Middle');
+    });
+
+    it('should handle mixed import styles', () => {
+      const code = `
+import defaultExport from 'module1';
+import * as namespace from 'module2';
+import { named1, named2 as alias } from 'module3';
+const commonjs = require('module4');
+const { destructured } = require('module5');
+      `;
+      const result = analyzeFile(code, 'imports.js');
+
+      expect(result.imports.length).toBeGreaterThan(0);
+    });
+
+    it('should handle generator functions', () => {
+      const code = `
+function* generateNumbers() {
+  yield 1;
+  yield 2;
+  yield 3;
+}
+      `;
+      const result = analyzeFile(code, 'generator.js');
+
+      expect(result.functions).toHaveLength(1);
+      expect(result.functions[0].name).toBe('generateNumbers');
+    });
+
+    it('should handle async functions', () => {
+      const code = `
+async function fetchData() {
+  const data = await fetch('/api');
+  return data;
+}
+      `;
+      const result = analyzeFile(code, 'async.js');
+
+      expect(result.functions).toHaveLength(1);
+      expect(result.functions[0].name).toBe('fetchData');
+    });
+
+    it('should handle special method names', () => {
+      const code = `
+class Example {
+  ['computed' + 'Name']() {}
+  [Symbol.iterator]() {}
+}
+      `;
+      const result = analyzeFile(code, 'special.js');
+
+      expect(result.classes).toHaveLength(1);
+      expect(result.classes[0].methods.length).toBeGreaterThan(0);
+    });
+  });
 });

@@ -32,7 +32,8 @@ describe('processFile - Integration Tests', () => {
     const result = processFile(filePath, {});
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe('not found');
+    expect(result.error).toBeDefined();
+    expect(result.errorType).toBe('FILE_NOT_FOUND');
   });
 
   it('should handle parse errors', () => {
@@ -40,7 +41,8 @@ describe('processFile - Integration Tests', () => {
     const result = processFile(filePath, {});
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain('parse failed');
+    expect(result.error).toBeDefined();
+    expect(result.errorType).toBe('PARSE_ERROR');
   });
 
   it('should extract complete file information', () => {
