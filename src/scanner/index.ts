@@ -5,12 +5,34 @@ import { SUPPORTED_EXTENSIONS, DEFAULT_EXCLUDES, MAX_DIR_DEPTH } from '../consta
 import { logger } from '../cli';
 
 /**
+ * 获取 git 仓库根目录
+ */
+function getGitRoot(cwd: string): string | null {
+  try {
+    return child_process
+      .execSync('git rev-parse --show-toplevel', {
+        cwd,
+        encoding: 'utf-8'
+      })
+      .trim();
+  } catch {
+    return null;
+  }
+}
+
+/**
  * 获取 git 改动的文件列表
  */
 export function getGitChangedFiles(projectDir: string, stagedOnly = false): string[] {
   const files: string[] = [];
 
   try {
+    // 获取 git 仓库根目录
+    const gitRoot = getGitRoot(projectDir);
+    if (!gitRoot) {
+      return [];
+    }
+
     let output: string;
     if (stagedOnly) {
       // 只获取 staged 文件
@@ -44,17 +66,46 @@ export function getGitChangedFiles(projectDir: string, stagedOnly = false): stri
         return (SUPPORTED_EXTENSIONS as readonly string[]).includes(ext);
       });
 
-    // 去重并转换为绝对路径
+    // 去重并转换为绝对路径（相对于 git 根目录）
     const uniqueFiles = [...new Set(changedFiles)];
     for (const f of uniqueFiles) {
-      const fullPath = path.resolve(projectDir, f);
-      if (fs.existsSync(fullPath)) {
+      // git 返回的路径是相对于仓库根目录的
+      const fullPath = path.resolve(gitRoot, f);
+      // 只包含 projectDir 下的文件
+      if (fs.existsSync(fullPath) && fullPath.startsWith(path.resolve(projectDir))) {
         files.push(fullPath);
       }
     }
   } catch {
     // 不是 git 仓库或其他错误
     return [];
+  }
+
+  return files;
+}
+
+/**
+ * 扫描单个目录下的代码文件（不递归）
+ */
+export function scanSingleDirectory(dir: string): string[] {
+  const files: string[] = [];
+
+  if (!fs.existsSync(dir)) {
+    return files;
+  }
+
+  try {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isFile()) {
+        const ext = path.extname(entry.name);
+        if ((SUPPORTED_EXTENSIONS as readonly string[]).includes(ext)) {
+          files.push(path.join(dir, entry.name));
+        }
+      }
+    }
+  } catch {
+    return files;
   }
 
   return files;

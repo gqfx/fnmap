@@ -4,7 +4,7 @@ import type { CLIOptions, FileInfoEntry } from './types';
 import { COLORS, DEFAULT_EXCLUDES } from './constants';
 import { logger, setupCLI, setQuietMode } from './cli';
 import { loadConfig, mergeConfig } from './config';
-import { scanDirectory, getGitChangedFiles } from './scanner';
+import { scanDirectory, getGitChangedFiles, scanSingleDirectory } from './scanner';
 import { processFile } from './processor';
 import { generateAiMap, generateFileMermaid, generateProjectMermaid } from './generator';
 
@@ -52,11 +52,23 @@ export function main(): void {
   let filesToProcess: string[] = [];
 
   if (options.changed || options.staged) {
-    // 基于git改动
-    filesToProcess = getGitChangedFiles(projectDir, options.staged);
-    if (filesToProcess.length === 0) {
+    // 基于git改动 - 增量模式
+    const changedFiles = getGitChangedFiles(projectDir, options.staged);
+    if (changedFiles.length === 0) {
       logger.info('No git changed code files detected');
       return;
+    }
+
+    // 收集变更文件所在的目录
+    const affectedDirs = new Set<string>();
+    for (const filePath of changedFiles) {
+      affectedDirs.add(path.dirname(filePath));
+    }
+
+    // 对于每个受影响的目录，扫描该目录下所有代码文件
+    for (const dir of affectedDirs) {
+      const dirFiles = scanSingleDirectory(dir);
+      filesToProcess.push(...dirFiles);
     }
   } else if (fileArgs.length > 0) {
     // 指定的文件
