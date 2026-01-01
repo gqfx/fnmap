@@ -1,0 +1,5 @@
+{
+  "enable": true,
+  "include": ["src/**/*.js", "lib/**/*.ts"],
+  "exclude": ["dist", "build"]
+}
