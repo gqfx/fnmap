@@ -296,6 +296,6 @@ MIT
 
 ## Support
 
-- 🐛 [Report Issues](https://github.com/yourusername/fnmap/issues)
-- 💡 [Feature Requests](https://github.com/yourusername/fnmap/issues)
-- 📖 [Documentation](https://github.com/yourusername/fnmap)
+- 🐛 [Report Issues](https://github.com/gqfx/fnmap/issues)
+- 💡 [Feature Requests](https://github.com/gqfx/fnmap/issues)
+- 📖 [Documentation](https://github.com/gqfx/fnmap)
