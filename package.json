@@ -1,6 +1,6 @@
 {
   "name": "@didnhdj/fnmap",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "AI code indexing tool for analyzing JS/TS code structure and generating structured code maps to help AI understand code quickly",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
