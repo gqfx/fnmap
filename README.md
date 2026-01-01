@@ -219,6 +219,12 @@ fnmap --mermaid project
 - `.tsx` - React TypeScript
 - `.mjs` - ES Modules
 
+## Limitations
+
+To ensure performance and safety, fnmap has the following default limits:
+- **File Size**: Maximum 10MB per file
+- **Directory Depth**: Maximum recursion depth of 50 levels
+
 ## How It Works
 
 1. **AST Parsing**: Uses `@babel/parser` to parse code into Abstract Syntax Tree

@@ -219,6 +219,13 @@ fnmap --mermaid project
 - `.tsx` - React TypeScript
 - `.mjs` - ES Modules
 
+## 限制
+
+为了保证性能和安全，fnmap 有以下默认限制：
+- **文件大小**：单个文件最大支持 10MB
+- **目录深度**：最大递归深度为 50 层
+- **超时**：目前没有硬性超时限制，但处理超大文件可能会较慢
+
 ## 工作原理
 
 1. **AST 解析**：使用 `@babel/parser` 将代码解析为抽象语法树
@@ -241,14 +248,14 @@ fnmap --files src/utils.js
 fnmap - AI 代码索引生成工具
 ==================================================
 
-分析: src/utils.js
-✓ 导入: 3, 函数: 5, 类: 0, 常量: 2
+Analyzing: src/utils.js
+✓ Imports: 3, Functions: 5, Classes: 0, Constants: 2
 
-生成 .fnmap 索引...
+Generating .fnmap index...
 ✓ src/.fnmap
 
 ==================================================
-完成! 分析: 1, 失败: 0
+Complete! Analyzed: 1, Failed: 0
 ==================================================
 ```
 
