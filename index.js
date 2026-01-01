@@ -14,10 +14,10 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const child_process = require('child_process');
 const parser = require('@babel/parser');
 const traverse = require('@babel/traverse').default;
-const { program } = require('commander');
+const { Command } = require('commander');
 
 // ============== 配置 ==============
 
@@ -295,6 +295,7 @@ function getVersion() {
  * 配置CLI命令
  */
 function setupCLI() {
+  const program = new Command();
   program
     .name('fnmap')
     .description('AI code indexing tool - Analyzes JS/TS code structure and generates structured code maps')
@@ -348,21 +349,21 @@ function getGitChangedFiles(projectDir, stagedOnly = false) {
     let output;
     if (stagedOnly) {
       // 只获取 staged 文件
-      output = execSync('git diff --cached --name-only --diff-filter=ACMR', {
+      output = child_process.execSync('git diff --cached --name-only --diff-filter=ACMR', {
         cwd: projectDir,
         encoding: 'utf-8'
       });
     } else {
       // 获取所有改动文件（包括 staged、modified、untracked）
-      const staged = execSync('git diff --cached --name-only --diff-filter=ACMR', {
+      const staged = child_process.execSync('git diff --cached --name-only --diff-filter=ACMR', {
         cwd: projectDir,
         encoding: 'utf-8'
       });
-      const modified = execSync('git diff --name-only --diff-filter=ACMR', {
+      const modified = child_process.execSync('git diff --name-only --diff-filter=ACMR', {
         cwd: projectDir,
         encoding: 'utf-8'
       });
-      const untracked = execSync('git ls-files --others --exclude-standard', {
+      const untracked = child_process.execSync('git ls-files --others --exclude-standard', {
         cwd: projectDir,
         encoding: 'utf-8'
       });
@@ -1015,7 +1016,9 @@ function generateAiMap(dirPath, filesInfo) {
  */
 function generateFileMermaid(fileName, info) {
   const lines = ['flowchart TD'];
-  const safeId = (name) => name.replace(/[^a-zA-Z0-9_]/g, '_');
+  // 使用更安全的ID生成策略以避免冲突 (例如 test.js 和 test_js)
+  const safeId = (name) => 'id_' + name.replace(/[^a-zA-Z0-9]/g, c => `_${c.charCodeAt(0)}_`);
+  const escapeLabel = (text) => text.replace(/"/g, '#quot;');
 
   // 收集所有函数节点
   const functions = info.functions.map(fn => fn.name);
@@ -1032,12 +1035,12 @@ function generateFileMermaid(fileName, info) {
   }
 
   // 添加子图标题
-  const baseName = path.basename(fileName, path.extname(fileName));
-  lines.push(`  subgraph ${safeId(baseName)}["${baseName}"]`);
+  // const baseName = path.basename(fileName, path.extname(fileName)); // Removed stripping
+  lines.push(`  subgraph ${safeId(fileName)}["${escapeLabel(fileName)}"]`);
 
   // 添加函数节点
   for (const fn of allFunctions) {
-    lines.push(`    ${safeId(fn)}["${fn}"]`);
+    lines.push(`    ${safeId(fn)}["${escapeLabel(fn)}"]`);
   }
   lines.push('  end');
 
@@ -1063,7 +1066,9 @@ function generateFileMermaid(fileName, info) {
  */
 function generateProjectMermaid(projectDir, allFilesInfo) {
   const lines = ['flowchart TD'];
-  const safeId = (name) => name.replace(/[^a-zA-Z0-9_]/g, '_');
+
+  const safeId = (name) => 'id_' + name.replace(/[^a-zA-Z0-9]/g, c => `_${c.charCodeAt(0)}_`);
+  const escapeLabel = (text) => text.replace(/"/g, '#quot;');
 
   // 收集所有文件的函数和它们的调用关系
   const fileToFunctions = new Map();
@@ -1099,23 +1104,23 @@ function generateProjectMermaid(projectDir, allFilesInfo) {
   for (const [relativePath, { fileName, functions }] of fileToFunctions) {
     if (functions.length === 0) continue;
 
-    lines.push(`  subgraph ${safeId(fileName)}["${fileName}"]`);
+    lines.push(`  subgraph ${safeId(relativePath)}["${escapeLabel(fileName)}"]`);
     for (const fn of functions) {
-      lines.push(`    ${safeId(fileName)}_${safeId(fn)}["${fn}"]`);
+      lines.push(`    ${safeId(relativePath)}_${safeId(fn)}["${escapeLabel(fn)}"]`);
     }
     lines.push('  end');
   }
 
   // 添加调用关系边
   const addedEdges = new Set();
-  for (const { fileName, caller, callee } of allCallEdges) {
-    const callerId = `${safeId(fileName)}_${safeId(caller)}`;
+  for (const { file, fileName, caller, callee } of allCallEdges) {
+    const callerId = `${safeId(file)}_${safeId(caller)}`;
 
     // 查找callee所在的文件
     let calleeId = null;
-    for (const [, { fileName: fn, functions }] of fileToFunctions) {
+    for (const [pathKey, { fileName: fn, functions }] of fileToFunctions) {
       if (functions.includes(callee)) {
-        calleeId = `${safeId(fn)}_${safeId(callee)}`;
+        calleeId = `${safeId(pathKey)}_${safeId(callee)}`;
         break;
       }
     }
@@ -1128,7 +1133,7 @@ function generateProjectMermaid(projectDir, allFilesInfo) {
         )
       ) || { functions: [] };
       if (functions.includes(callee)) {
-        calleeId = `${safeId(fileName)}_${safeId(callee)}`;
+        calleeId = `${safeId(fileName)}_${safeId(callee)}`; // Fallback, imperfect
       }
     }
 
@@ -1205,7 +1210,7 @@ function processFile(filePath, options) {
 
 function main() {
   // 配置并解析CLI
-  setupCLI();
+  const program = setupCLI();
   program.parse(process.argv);
 
   const options = program.opts();
@@ -1396,7 +1401,9 @@ module.exports = {
   validateFilePath,
   validateConfig,
   formatError,
-  ErrorTypes
+  ErrorTypes,
+  main,
+  setupCLI
 };
 
 // 直接运行
