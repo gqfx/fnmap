@@ -6,7 +6,7 @@ import {
   generateAiMap,
   generateFileMermaid,
   generateProjectMermaid
-} from '../index.js';
+} from '../index';
 import fs from 'fs';
 import path from 'path';
 
@@ -220,6 +220,10 @@ describe('generateFileMermaid', () => {
       classes: [
         {
           name: 'MyClass',
+          superClass: null,
+          startLine: 0,
+          endLine: 0,
+          description: '',
           methods: [
             { name: 'method1', params: '', line: 5, static: false, kind: 'method', description: '' },
             { name: 'method2', params: '', line: 10, static: false, kind: 'method', description: '' }

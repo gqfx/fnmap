@@ -4,7 +4,7 @@ import { resolve } from 'path';
 export default defineConfig({
   build: {
     lib: {
-      entry: resolve(__dirname, 'index.js'),
+      entry: resolve(__dirname, 'src/index.ts'),
       name: 'fnmap',
       fileName: 'index',
       formats: ['cjs']
@@ -23,7 +23,8 @@ export default defineConfig({
       ]
     },
     outDir: 'dist',
-    emptyOutDir: true
+    emptyOutDir: true,
+    sourcemap: true
   },
   test: {
     globals: true,
@@ -39,9 +40,8 @@ export default defineConfig({
         'node_modules/',
         'test/',
         'dist/',
-        '*.config.js'
+        '*.config.ts'
       ]
     }
   }
 });
-

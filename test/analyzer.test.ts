@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { analyzeFile } from '../index.js';
+import { analyzeFile } from '../index';
 import fs from 'fs';
 import path from 'path';
 
@@ -10,10 +10,10 @@ describe('analyzeFile', () => {
 
     expect(result).toBeDefined();
     expect(result.parseError).toBeUndefined();
-    expect(result.functions).toHaveLength(3);
-    expect(result.functions[0].name).toBe('add');
-    expect(result.functions[0].params).toBe('a,b');
-    expect(result.functions[0].description).toContain('Add two numbers');
+    expect(result.functions!).toHaveLength(3);
+    expect(result.functions![0].name).toBe('add');
+    expect(result.functions![0].params).toBe('a,b');
+    expect(result.functions![0].description).toContain('Add two numbers');
   });
 
   it('should extract function parameters correctly', () => {
@@ -159,7 +159,8 @@ function withRest(first, ...rest) {
     });
 
     it('should handle non-string code', () => {
-      const result = analyzeFile(123, 'test.js');
+      // @ts-ignore
+    const result = analyzeFile(123 as any, 'test.js');
 
       expect(result.parseError).toBeDefined();
       expect(result.errorType).toBe('VALIDATION_ERROR');
@@ -208,9 +209,9 @@ function 测试函数(参数一, 参数二) {
       `;
       const result = analyzeFile(code, 'unicode.js');
 
-      expect(result.functions).toHaveLength(1);
-      expect(result.functions[0].name).toBe('测试函数');
-      expect(result.functions[0].description).toContain('中文函数描述');
+      expect(result.functions!).toHaveLength(1);
+      expect(result.functions![0].name).toBe('测试函数');
+      expect(result.functions![0].description).toContain('中文函数描述');
     });
 
     it('should handle emoji in code', () => {
@@ -221,8 +222,8 @@ function sendMessage(emoji = '👋') {
       `;
       const result = analyzeFile(code, 'emoji.js');
 
-      expect(result.functions).toHaveLength(1);
-      expect(result.functions[0].name).toBe('sendMessage');
+      expect(result.functions!).toHaveLength(1);
+      expect(result.functions![0].name).toBe('sendMessage');
     });
 
     it('should handle deeply nested functions', () => {
@@ -243,8 +244,8 @@ function level1() {
       const result = analyzeFile(code, 'nested.js');
 
       // Babel's FunctionDeclaration visitor captures all function declarations
-      expect(result.functions.length).toBeGreaterThan(0);
-      expect(result.functions.some(f => f.name === 'level1')).toBe(true);
+      expect(result.functions!.length).toBeGreaterThan(0);
+      expect(result.functions!.some(f => f.name === 'level1')).toBe(true);
     });
 
     it('should handle very long function names', () => {
@@ -252,8 +253,8 @@ function level1() {
       const code = `function ${codeName}() { return true; }`;
       const result = analyzeFile(code, 'long.js');
 
-      expect(result.functions).toHaveLength(1);
-      expect(result.functions[0].name).toBe(codeName);
+      expect(result.functions!).toHaveLength(1);
+      expect(result.functions![0].name).toBe(codeName);
     });
 
     it('should handle syntax error gracefully', () => {
@@ -281,7 +282,7 @@ function process(config) {
       const result = analyzeFile(code, 'modern.js');
 
       expect(result.parseError).toBeUndefined();
-      expect(result.functions).toHaveLength(1);
+      expect(result.functions!).toHaveLength(1);
     });
 
     it('should handle TypeScript without filePath extension', () => {
@@ -310,9 +311,9 @@ function funcB() {
       `;
       const result = analyzeFile(code, 'circular.js');
 
-      expect(result.functions).toHaveLength(2);
-      expect(result.callGraph.funcA).toContain('funcB');
-      expect(result.callGraph.funcB).toContain('funcA');
+      expect(result.functions!).toHaveLength(2);
+      expect(result.callGraph!.funcA).toContain('funcB');
+      expect(result.callGraph!.funcB).toContain('funcA');
     });
 
     it('should handle large file with many functions', () => {
@@ -322,7 +323,7 @@ function funcB() {
       }
       const result = analyzeFile(code, 'large.js');
 
-      expect(result.functions).toHaveLength(100);
+      expect(result.functions!).toHaveLength(100);
     });
 
     it('should handle complex class hierarchy', () => {
@@ -340,9 +341,9 @@ class Child extends Middle {
       `;
       const result = analyzeFile(code, 'hierarchy.js');
 
-      expect(result.classes).toHaveLength(3);
-      expect(result.classes[1].superClass).toBe('Base');
-      expect(result.classes[2].superClass).toBe('Middle');
+      expect(result.classes!).toHaveLength(3);
+      expect(result.classes![1].superClass).toBe('Base');
+      expect(result.classes![2].superClass).toBe('Middle');
     });
 
     it('should handle mixed import styles', () => {
@@ -355,7 +356,7 @@ const { destructured } = require('module5');
       `;
       const result = analyzeFile(code, 'imports.js');
 
-      expect(result.imports.length).toBeGreaterThan(0);
+      expect(result.imports!.length).toBeGreaterThan(0);
     });
 
     it('should handle generator functions', () => {
@@ -368,8 +369,8 @@ function* generateNumbers() {
       `;
       const result = analyzeFile(code, 'generator.js');
 
-      expect(result.functions).toHaveLength(1);
-      expect(result.functions[0].name).toBe('generateNumbers');
+      expect(result.functions!).toHaveLength(1);
+      expect(result.functions![0].name).toBe('generateNumbers');
     });
 
     it('should handle async functions', () => {
@@ -381,8 +382,8 @@ async function fetchData() {
       `;
       const result = analyzeFile(code, 'async.js');
 
-      expect(result.functions).toHaveLength(1);
-      expect(result.functions[0].name).toBe('fetchData');
+      expect(result.functions!).toHaveLength(1);
+      expect(result.functions![0].name).toBe('fetchData');
     });
 
     it('should handle special method names', () => {
@@ -394,8 +395,8 @@ class Example {
       `;
       const result = analyzeFile(code, 'special.js');
 
-      expect(result.classes).toHaveLength(1);
-      expect(result.classes[0].methods.length).toBeGreaterThan(0);
+      expect(result.classes!).toHaveLength(1);
+      expect(result.classes![0].methods.length).toBeGreaterThan(0);
     });
   });
 });

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { main } from '../index.js';
+import { main } from '../index';
 import { program } from 'commander';
 
 const __filename = fileURLToPath(import.meta.url);

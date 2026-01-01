@@ -8,19 +8,19 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 describe('Scanner & Git Integration', () => {
-  let scanDirectory;
-  let getGitChangedFiles;
-  let execSyncSpy;
+  let scanDirectory: (dir: string, baseDir?: string) => string[];
+  let getGitChangedFiles: (dir: string, stagedOnly?: boolean) => string[];
+  let execSyncSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
     vi.resetModules(); // Reset cache to ensure fresh import with mocks
 
     // Setup spy BEFORE importing index.js
-    execSyncSpy = vi.spyOn(child_process, 'execSync').mockImplementation(() => '');
+    execSyncSpy = vi.spyOn(child_process, 'execSync').mockImplementation(() => '') as any; // Cast to any to avoid strict definition issues with overload
 
-    const module = await import('../index.js');
-    scanDirectory = module.scanDirectory;
-    getGitChangedFiles = module.getGitChangedFiles;
+    // const module = await import('../index.js');
+    scanDirectory = require('../index').scanDirectory;
+    getGitChangedFiles = require('../index').getGitChangedFiles;
   });
 
   afterEach(() => {
@@ -64,7 +64,7 @@ describe('Scanner & Git Integration', () => {
 
       spy.mockImplementation((pathArg, options) => {
         if (pathArg.toString().includes('perm-test')) {
-          const err = new Error('EACCES: permission denied');
+          const err = new Error('EACCES: permission denied') as Error & { code: string };
           err.code = 'EACCES';
           throw err;
         }
@@ -82,11 +82,11 @@ describe('Scanner & Git Integration', () => {
 
   describe('getGitChangedFiles', () => {
     it('should parse git diff output correctly', () => {
-      execSyncSpy.mockImplementation((cmd) => {
+      execSyncSpy.mockImplementation(((cmd: any) => {
         if (cmd.includes('--cached')) return 'staged.js\n';
         if (cmd.includes('ls-files')) return 'untracked.js\n';
         return 'modified.js\nfile with spaces.ts\n';
-      });
+      }) as any);
 
       const existsSpy = vi.spyOn(fs, 'existsSync').mockReturnValue(true);
       const resolveSpy = vi.spyOn(path, 'resolve').mockImplementation((...args) => args.join('/'));

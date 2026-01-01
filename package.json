@@ -2,22 +2,24 @@
   "name": "fnmap",
   "version": "0.1.0",
   "description": "AI code indexing tool for analyzing JS/TS code structure and generating structured code maps to help AI understand code quickly",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "bin": {
-    "fnmap": "./index.js"
+    "fnmap": "./dist/index.js"
   },
   "files": [
-    "index.js",
     "dist",
     "README.md",
     "README_CN.md",
     "LICENSE"
   ],
   "scripts": {
+    "build": "tsc && vite build",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "build": "vite build",
     "prepublishOnly": "npm test && npm run build",
     "prepare": "npm run build"
   },
@@ -55,9 +57,12 @@
     "prettier": "^3.7.4"
   },
   "devDependencies": {
+    "@types/babel__traverse": "^7.28.0",
+    "@types/node": "^25.0.3",
     "@vitest/coverage-v8": "^1.1.0",
     "cross-env": "^10.1.0",
     "esbuild": "^0.27.2",
+    "typescript": "^5.9.3",
     "vite": "^5.0.0",
     "vitest": "^1.1.0"
   }

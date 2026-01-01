@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { processFile } from '../index.js';
+import { processFile } from '../index';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -14,8 +14,8 @@ describe('processFile - Integration Tests', () => {
 
     expect(result.success).toBe(true);
     expect(result.info).toBeDefined();
-    expect(result.info.functions).toBeDefined();
-    expect(result.info.functions.length).toBeGreaterThan(0);
+    expect(result.info!.functions).toBeDefined();
+    expect(result.info!.functions!.length).toBeGreaterThan(0);
   });
 
   it('should process a TypeScript file successfully', () => {
@@ -24,7 +24,7 @@ describe('processFile - Integration Tests', () => {
 
     expect(result.success).toBe(true);
     expect(result.info).toBeDefined();
-    expect(result.info.classes).toBeDefined();
+    expect(result.info!.classes).toBeDefined();
   });
 
   it('should handle file not found error', () => {
@@ -50,11 +50,11 @@ describe('processFile - Integration Tests', () => {
     const result = processFile(filePath, {});
 
     expect(result.success).toBe(true);
-    expect(result.info.imports).toBeDefined();
-    expect(result.info.functions).toBeDefined();
-    expect(result.info.classes).toBeDefined();
-    expect(result.info.constants).toBeDefined();
-    expect(result.info.callGraph).toBeDefined();
+    expect(result.info!.imports).toBeDefined();
+    expect(result.info!.functions).toBeDefined();
+    expect(result.info!.classes).toBeDefined();
+    expect(result.info!.constants).toBeDefined();
+    expect(result.info!.callGraph).toBeDefined();
   });
 
   it('should handle class files correctly', () => {
@@ -62,9 +62,9 @@ describe('processFile - Integration Tests', () => {
     const result = processFile(filePath, {});
 
     expect(result.success).toBe(true);
-    expect(result.info.classes).toHaveLength(1);
+    expect(result.info!.classes).toHaveLength(1);
     
-    const myClass = result.info.classes[0];
+    const myClass = result.info!.classes![0];
     expect(myClass.name).toBe('MyClass');
     expect(myClass.superClass).toBe('EventEmitter');
     expect(myClass.methods.length).toBeGreaterThan(0);
@@ -79,14 +79,14 @@ describe('End-to-End Workflow', () => {
     expect(result.success).toBe(true);
 
     // 可以生成 header
-    const { generateHeader } = require('../index.js');
-    const header = generateHeader(result.info, 'sample.js');
+    const { generateHeader } = require('../index');
+    const header = generateHeader(result.info!, 'sample.js');
     expect(header).toContain('/*@AI');
     expect(header).toContain('@AI*/');
 
     // 可以生成 mermaid
-    const { generateFileMermaid } = require('../index.js');
-    const mermaid = generateFileMermaid('sample.js', result.info);
+    const { generateFileMermaid } = require('../index');
+    const mermaid = generateFileMermaid('sample.js', result.info!);
     expect(mermaid).toBeDefined();
     expect(mermaid).toContain('flowchart TD');
   });

@@ -5,7 +5,7 @@ import {
   validateConfig,
   formatError,
   ErrorTypes 
-} from '../index.js';
+} from '../index';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -247,13 +247,14 @@ describe('Error Handling', () => {
       
       expect(result.success).toBe(true);
       expect(result.info).toBeDefined();
-      expect(result.info.functions).toEqual([]);
-      expect(result.info.classes).toEqual([]);
+      expect(result.info!.functions).toEqual([]);
+      expect(result.info!.classes).toEqual([]);
     });
 
     it('should catch file read errors', () => {
       // 这个测试在某些系统上可能无法创建不可读的文件
       // 所以我们只是验证错误处理机制存在
+      // @ts-ignore
       const result = processFile(null, {});
       
       expect(result.success).toBe(false);
