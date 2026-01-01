@@ -82,24 +82,23 @@ export function main(): void {
 
   const projectDir = path.resolve(options.project);
 
-  // init命令：创建默认配置文件
+  // init命令：创建配置文件并更新 agent 文档
   if (options.init) {
+    // 1. 检查并创建 .fnmaprc
     const configPath = path.join(projectDir, '.fnmaprc');
     if (fs.existsSync(configPath)) {
       console.log(`${COLORS.yellow}!${COLORS.reset} Config file already exists: .fnmaprc`);
-      return;
+    } else {
+      const defaultConfig = {
+        enable: true,
+        include: ['src/**/*.js', 'src/**/*.ts', 'src/**/*.jsx', 'src/**/*.tsx'],
+        exclude: ['node_modules', 'dist', 'build', '.next', 'coverage', '__pycache__', '.cache']
+      };
+      fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2));
+      console.log(`${COLORS.green}✓${COLORS.reset} Created config file: .fnmaprc`);
     }
 
-    const defaultConfig = {
-      enable: true,
-      include: ['src/**/*.js', 'src/**/*.ts', 'src/**/*.jsx', 'src/**/*.tsx'],
-      exclude: ['node_modules', 'dist', 'build', '.next', 'coverage', '__pycache__', '.cache']
-    };
-
-    fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2));
-    console.log(`${COLORS.green}✓${COLORS.reset} Created config file: .fnmaprc`);
-
-    // 检查并更新 CLAUDE.md 或 AGENTS.md
+    // 2. 检查并更新 CLAUDE.md 或 AGENTS.md（独立检测）
     appendFnmapDocsToAgentFiles(projectDir);
     return;
   }
