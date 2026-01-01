@@ -57,10 +57,10 @@ export { generateHeader, removeExistingHeaders, generateAiMap, generateFileMerma
 export { processFile } from './processor';
 
 // 导出主函数
-export { main } from './main';
+import { main } from './main';
+export { main };
 
 // CLI 入口
 if (require.main === module) {
-  const { main } = require('./main');
   main();
 }
