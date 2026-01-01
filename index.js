@@ -1096,7 +1096,20 @@ function main() {
 }
 
 // 导出供外部调用
-module.exports = { analyzeFile, generateHeader, processFile, scanDirectory, getGitChangedFiles };
+module.exports = {
+  analyzeFile,
+  generateHeader,
+  removeExistingHeaders,
+  generateAiMap,
+  generateFileMermaid,
+  generateProjectMermaid,
+  processFile,
+  scanDirectory,
+  getGitChangedFiles,
+  extractJSDocDescription,
+  loadConfig,
+  mergeConfig
+};
 
 // 直接运行
 if (require.main === module) {

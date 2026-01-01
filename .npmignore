@@ -1,0 +1,15 @@
+node_modules
+test
+coverage
+*.test.js
+*.spec.js
+.github
+.gitignore
+.fnmaprc
+vite.config.js
+vitest.config.js
+tsconfig.json
+.DS_Store
+*.log
+.vscode
+.idea

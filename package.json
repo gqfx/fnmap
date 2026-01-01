@@ -1,17 +1,25 @@
 {
   "name": "fnmap",
   "version": "0.1.0",
-  "description": "AI code indexing tool for analyzing JS/TS code structure and generating structured code maps",
+  "description": "AI code indexing tool for analyzing JS/TS code structure and generating structured code maps to help AI understand code quickly",
   "main": "index.js",
   "bin": {
     "fnmap": "./index.js"
   },
   "files": [
-    "index.js"
+    "index.js",
+    "dist",
+    "README.md",
+    "README_CN.md",
+    "LICENSE"
   ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "esbuild index.js --bundle --platform=node --outfile=dist/index.bundle.js --minify"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "build": "vite build",
+    "prepublishOnly": "npm test && npm run build",
+    "prepare": "npm run build"
   },
   "keywords": [
     "ai",
@@ -21,10 +29,20 @@
     "typescript",
     "code-index",
     "code-map",
-    "fnmap"
+    "fnmap",
+    "code-intelligence",
+    "static-analysis"
   ],
-  "author": "",
+  "author": "gqfx <didnhdj2@gmail.com>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gqfx/fnmap.git"
+  },
+  "bugs": {
+    "url": "https://github.com/gqfx/fnmap/issues"
+  },
+  "homepage": "https://github.com/gqfx/fnmap#readme",
   "engines": {
     "node": ">=14.0.0"
   },
@@ -37,6 +55,9 @@
     "prettier": "^3.7.4"
   },
   "devDependencies": {
-    "esbuild": "^0.27.2"
+    "@vitest/coverage-v8": "^1.1.0",
+    "esbuild": "^0.27.2",
+    "vite": "^5.0.0",
+    "vitest": "^1.1.0"
   }
 }
