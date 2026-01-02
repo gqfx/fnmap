@@ -124,7 +124,7 @@ export interface CLIOptions {
   changed?: boolean;
   staged?: boolean;
   mermaid?: boolean | 'file' | 'project';
-  quiet?: boolean;
+  log?: boolean;
   init?: boolean;
   clear?: boolean;
 }

@@ -2,8 +2,8 @@ import { Command } from 'commander';
 import { COLORS } from '../constants';
 import { normalizePath } from '../validation';
 
-// 日志工具
-let quietMode = false;
+// 日志工具 - 默认静默模式，只显示统计信息
+let quietMode = true;
 
 // 使用模块级变量存储 program 实例
 let _program: Command | null = null;
@@ -23,6 +23,10 @@ export const logger = {
   },
   title: (msg: string): void => {
     if (!quietMode) console.log(`${COLORS.bold}${msg}${COLORS.reset}`);
+  },
+  // 统计信息 - 始终显示，不受静默模式影响
+  stats: (msg: string): void => {
+    console.log(msg);
   }
 };
 
@@ -65,11 +69,11 @@ export function setupCLI(): Command {
         .filter(Boolean)
     )
     .option('-d, --dir <dir>', 'Process all code files in directory', (val: string) => normalizePath(val))
-    .option('-p, --project <dir>', 'Specify project root directory', (val: string) => normalizePath(val), process.env.CLAUDE_PROJECT_DIR ?? process.cwd())
+    .option('-p, --project <dir>', 'Specify project root directory (default: current directory)', (val: string) => normalizePath(val), process.env.CLAUDE_PROJECT_DIR ?? process.cwd())
     .option('-c, --changed', 'Process only git changed files (staged + modified + untracked)')
     .option('-s, --staged', 'Process only git staged files (for pre-commit hook)')
     .option('-m, --mermaid [mode]', 'Generate Mermaid call graph (file=file-level, project=project-level)')
-    .option('-q, --quiet', 'Quiet mode')
+    .option('-l, --log', 'Show detailed processing logs')
     .option('--init', 'Create default config file and setup project (interactive)')
     .option('--clear', 'Clear generated files (.fnmap, *.fnmap, *.mermaid)')
     .argument('[files...]', 'Directly specify file paths')
@@ -83,7 +87,8 @@ Configuration files (by priority):
   package.json#fnmap    fnmap field in package.json
 
 Output:
-  .fnmap                Code index file (imports, functions, classes, constants, call graph)
+  .fnmap                Code index file in directory mode (imports, functions, classes, constants, call graph)
+  *.fnmap               Individual file index when using --files (e.g., module.fnmap)
   *.mermaid             Mermaid call graph (when using --mermaid file)
   .fnmap.mermaid        Project-level Mermaid call graph (when using --mermaid project)
 
@@ -91,7 +96,8 @@ Examples:
   $ fnmap --dir src                  Process src directory
   $ fnmap --files a.js,b.js          Process specified files
   $ fnmap --changed                  Process git changed files
-  $ fnmap --staged -q                For pre-commit hook usage
+  $ fnmap --staged                   For pre-commit hook usage
+  $ fnmap --log --dir src            Show detailed processing logs
   $ fnmap --mermaid file --dir src   Generate file-level call graphs
   $ fnmap --mermaid project          Generate project-level call graph
   $ fnmap --init                     Interactive project setup

@@ -92,7 +92,8 @@ describe('CLI', () => {
     const { main } = await import('../src/index');
     main();
 
-    expect(console.log).toHaveBeenCalledWith(expect.stringContaining('Analyzing'));
+    // 验证统计信息输出（始终显示）
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining('Complete'));
   });
 
   it('should handle --dir arguments', async () => {
@@ -105,7 +106,8 @@ describe('CLI', () => {
     const { main } = await import('../src/index');
     main();
 
-    expect(console.log).toHaveBeenCalledWith(expect.stringContaining('Analyzing'));
+    // 验证统计信息输出（始终显示）
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining('Complete'));
     // 应该会生成 .fnmap 文件
     expect(fs.existsSync(path.join(subDir, '.fnmap'))).toBe(true);
   });

@@ -4,7 +4,7 @@ import os from 'os';
 import readline from 'readline';
 import type { CLIOptions, FileInfoEntry } from './types';
 import { COLORS, DEFAULT_EXCLUDES } from './constants';
-import { logger, setupCLI, setQuietMode } from './cli';
+import { logger, setupCLI, setQuietMode, isQuietMode } from './cli';
 import { loadConfig, mergeConfig } from './config';
 import { scanDirectory, getGitChangedFiles, scanSingleDirectory } from './scanner';
 import { processFile } from './processor';
@@ -284,22 +284,28 @@ export async function main(): Promise<void> {
   const options = program.opts<CLIOptions>();
   const args = program.args;
 
-  // 设置静默模式
-  if (options.quiet) {
-    setQuietMode(true);
+  // 设置日志模式 - 默认静默，-l/--log 开启详细日志
+  if (options.log) {
+    setQuietMode(false);
   }
 
   const projectDir = path.resolve(options.project);
 
-  // clear命令：清理生成的文件
+  // clear命令：清理生成的文件（临时关闭静默模式）
   if (options.clear) {
+    const originalQuietMode = isQuietMode();
+    setQuietMode(false);
     executeClear(projectDir, options.dir);
+    setQuietMode(originalQuietMode);
     return;
   }
 
-  // init命令：交互式初始化
+  // init命令：交互式初始化（临时关闭静默模式）
   if (options.init) {
+    const originalQuietMode = isQuietMode();
+    setQuietMode(false);
     await executeInitInteractive(projectDir);
+    setQuietMode(originalQuietMode);
     return;
   }
 
@@ -509,7 +515,7 @@ export async function main(): Promise<void> {
   }
 
   logger.info('\n' + '='.repeat(50));
-  logger.info(
+  logger.stats(
     `Complete! Analyzed: ${COLORS.green}${processed}${COLORS.reset}, Failed: ${failed > 0 ? COLORS.red : ''}${failed}${COLORS.reset}`
   );
   logger.info('='.repeat(50));
