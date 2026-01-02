@@ -13,7 +13,7 @@ import type {
 } from '../types';
 import { ErrorTypes } from '../types';
 import { formatError } from '../validation';
-import { extractJSDocDescription } from './jsdoc';
+import { extractJSDocDescription, getLeadingComment } from './jsdoc';
 
 // 处理 ESM/CJS 兼容性
 const traverse = typeof _traverse === 'function' ? _traverse : (_traverse as { default: typeof _traverse }).default;
@@ -253,11 +253,7 @@ export function analyzeFile(code: unknown, filePath: string | null): AnalyzeResu
       const startLine = node.loc?.start?.line ?? 0;
       const endLine = node.loc?.end?.line ?? 0;
 
-      let desc = '';
-      const comments = node.leadingComments;
-      if (comments && comments.length > 0) {
-        desc = extractJSDocDescription(comments[comments.length - 1]);
-      }
+      const desc = extractJSDocDescription(getLeadingComment(node, nodePath.parent));
 
       info.functions.push({
         name,
@@ -275,11 +271,7 @@ export function analyzeFile(code: unknown, filePath: string | null): AnalyzeResu
       const endLine = node.loc?.end?.line ?? 0;
       const superClass = node.superClass?.type === 'Identifier' ? node.superClass.name : null;
 
-      let desc = '';
-      const comments = node.leadingComments;
-      if (comments && comments.length > 0) {
-        desc = extractJSDocDescription(comments[comments.length - 1]);
-      }
+      const desc = extractJSDocDescription(getLeadingComment(node, nodePath.parent));
 
       const methods: MethodInfo[] = [];
       if (node.body?.body) {
@@ -322,15 +314,13 @@ export function analyzeFile(code: unknown, filePath: string | null): AnalyzeResu
     },
 
     VariableDeclaration(nodePath: NodePath<t.VariableDeclaration>) {
-      if (nodePath.parent.type !== 'Program') return;
+      // 支持顶层常量和导出常量
+      const parentType = nodePath.parent.type;
+      if (parentType !== 'Program' && parentType !== 'ExportNamedDeclaration') return;
 
       const node = nodePath.node;
       if (node.kind === 'const') {
-        let desc = '';
-        const comments = node.leadingComments;
-        if (comments && comments.length > 0) {
-          desc = extractJSDocDescription(comments[comments.length - 1]);
-        }
+        const desc = extractJSDocDescription(getLeadingComment(node, nodePath.parent));
 
         for (const decl of node.declarations) {
           const name = decl.id?.type === 'Identifier' ? decl.id.name : undefined;

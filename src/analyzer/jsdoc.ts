@@ -1,7 +1,8 @@
-import type { Comment } from '@babel/types';
+import type { Comment, Node } from '@babel/types';
 
 /**
  * 从JSDoc注释中提取描述
+ * 优先级: @description标签 > 第一行非标签内容
  */
 export function extractJSDocDescription(comment: Comment | null | undefined): string {
   if (!comment) return '';
@@ -24,4 +25,25 @@ export function extractJSDocDescription(comment: Comment | null | undefined): st
   }
 
   return '';
+}
+
+/**
+ * 从节点获取leadingComments，支持导出声明
+ * 当节点本身没有注释时，检查父节点（ExportNamedDeclaration/ExportDefaultDeclaration）
+ */
+export function getLeadingComment(node: Node, parent: Node | null | undefined): Comment | null {
+  // 优先从节点本身获取
+  if (node.leadingComments && node.leadingComments.length > 0) {
+    return node.leadingComments[node.leadingComments.length - 1] ?? null;
+  }
+
+  // 检查父节点是否为导出声明
+  if (parent && (parent.type === 'ExportNamedDeclaration' || parent.type === 'ExportDefaultDeclaration')) {
+    const parentNode = parent as Node & { leadingComments?: Comment[] };
+    if (parentNode.leadingComments && parentNode.leadingComments.length > 0) {
+      return parentNode.leadingComments[parentNode.leadingComments.length - 1] ?? null;
+    }
+  }
+
+  return null;
 }
