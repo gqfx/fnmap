@@ -39,7 +39,20 @@ npm install --save-dev @didnhdj/fnmap
 fnmap --init
 ```
 
-这会在项目根目录创建 `.fnmaprc` 配置文件，并自动追加 fnmap 文档到 `CLAUDE.md` 或 `AGENTS.md`（如果存在，方便 AI 助手理解）。
+这个交互式命令会：
+1. 在项目根目录创建 `.fnmaprc` 配置文件
+2. 添加 fnmap 生成的文件到 `.gitignore`（可选）
+3. 自动追加 fnmap 格式文档到：
+   - `CLAUDE.md`（项目级 Claude AI 指令）
+   - `~/.claude/CLAUDE.md`（用户级全局指令）
+   - `AGENTS.md`（项目级 Agent 指令）
+   - 或任何你指定的自定义文件路径
+
+追加的文档帮助 AI 助手（如 Claude）理解 `.fnmap` 格式，使其能够：
+- 使用索引快速导航代码库
+- 通过行号定位函数和类
+- 理解代码结构和调用图
+- 提供更准确的代码建议
 
 ### 基本用法
 
@@ -219,7 +232,31 @@ interface FileInfo {
 
 ## 使用场景
 
-### 1. Pre-commit Hook
+### 1. AI 助手集成
+
+fnmap 专为帮助 AI 编程助手更好地理解代码库而设计：
+
+```bash
+# 初始化并设置 AI 文档
+fnmap --init
+
+# 为项目生成代码索引
+fnmap --dir src
+```
+
+`.fnmap` 文件帮助 AI 助手：
+- 高效导航大型代码库
+- 按名称和行号查找特定函数/类
+- 理解模块依赖和调用图
+- 提供上下文感知的代码建议
+
+**与 Claude Code 或类似 AI 工具的推荐工作流：**
+1. 运行 `fnmap --init` 将格式文档添加到 `CLAUDE.md`
+2. 使用 `fnmap --dir src` 生成索引文件
+3. AI 助手将自动读取 `.fnmap` 文件以获取上下文
+4. 代码变更时使用 `fnmap --changed` 更新索引
+
+### 2. Pre-commit Hook
 
 添加到 `.husky/pre-commit` 或 `.git/hooks/pre-commit`：
 
@@ -231,7 +268,7 @@ git add .fnmap
 
 这样在提交代码时会自动更新 `.fnmap` 索引。
 
-### 2. CI/CD 集成
+### 3. CI/CD 集成
 
 ```yaml
 # .github/workflows/ci.yml
@@ -242,7 +279,7 @@ git add .fnmap
     git diff --exit-code .fnmap || echo "Code index updated"
 ```
 
-### 3. 代码审查
+### 4. 代码审查
 
 ```bash
 # 为改动的文件生成索引
@@ -276,7 +313,6 @@ fnmap --log --changed
 2. **结构分析**：遍历 AST 提取导入、函数、类、常量
 3. **调用图谱**：追踪函数调用关系和依赖
 4. **索引生成**：生成紧凑的 `.fnmap` 文件，包含结构化信息
-5. **可视化**：可选生成 Mermaid 图表进行可视化展示
 
 ## 示例
 

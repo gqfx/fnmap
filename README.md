@@ -39,7 +39,20 @@ npm install --save-dev @didnhdj/fnmap
 fnmap --init
 ```
 
-This creates a `.fnmaprc` configuration file in your project root and automatically appends fnmap documentation to `CLAUDE.md` or `AGENTS.md` if they exist (useful for AI assistants).
+This interactive command will:
+1. Create a `.fnmaprc` configuration file in your project root
+2. Add fnmap-generated files to `.gitignore` (optional)
+3. Automatically append fnmap format documentation to:
+   - `CLAUDE.md` (project-level instructions for Claude AI)
+   - `~/.claude/CLAUDE.md` (user-level global instructions)
+   - `AGENTS.md` (project-level agent instructions)
+   - Or any custom file path you specify
+
+The appended documentation helps AI assistants (like Claude) understand the `.fnmap` format, enabling them to:
+- Quickly navigate your codebase using the index
+- Locate functions and classes by line number
+- Understand code structure and call graphs
+- Make more informed code suggestions
 
 ### Basic Usage
 
@@ -219,7 +232,31 @@ interface FileInfo {
 
 ## Use Cases
 
-### 1. Pre-commit Hook
+### 1. AI Assistant Integration
+
+fnmap is designed to help AI coding assistants understand your codebase better:
+
+```bash
+# Initialize and setup AI documentation
+fnmap --init
+
+# Generate code index for your project
+fnmap --dir src
+```
+
+The `.fnmap` files help AI assistants:
+- Navigate large codebases efficiently
+- Find specific functions/classes by name and line number
+- Understand module dependencies and call graphs
+- Provide context-aware code suggestions
+
+**Recommended workflow with Claude Code or similar AI tools:**
+1. Run `fnmap --init` to add format documentation to `CLAUDE.md`
+2. Generate index files with `fnmap --dir src`
+3. AI assistants will automatically read `.fnmap` files for context
+4. Update index when code changes with `fnmap --changed`
+
+### 2. Pre-commit Hook
 
 Add to `.husky/pre-commit` or `.git/hooks/pre-commit`:
 
@@ -231,7 +268,7 @@ git add .fnmap
 
 This automatically updates the `.fnmap` index when committing code.
 
-### 2. CI/CD Integration
+### 3. CI/CD Integration
 
 ```yaml
 # .github/workflows/ci.yml
@@ -242,7 +279,7 @@ This automatically updates the `.fnmap` index when committing code.
     git diff --exit-code .fnmap || echo "Code index updated"
 ```
 
-### 3. Code Review
+### 4. Code Review
 
 ```bash
 # Generate index for changed files
@@ -276,7 +313,6 @@ To ensure performance and safety, fnmap has the following default limits:
 2. **Structure Analysis**: Traverses AST to extract imports, functions, classes, constants
 3. **Call Graph**: Tracks function call relationships and dependencies
 4. **Index Generation**: Generates compact `.fnmap` files with structured information
-5. **Visualization**: Optionally generates Mermaid diagrams for visual representation
 
 ## Examples
 
