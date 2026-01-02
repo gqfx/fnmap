@@ -13,7 +13,9 @@ export default defineConfig({
       external: [
         'fs',
         'path',
+        'os',
         'child_process',
+        'node:readline',
         '@babel/parser',
         '@babel/traverse',
         '@babel/generator',

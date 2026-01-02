@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import readline from 'readline';
+import * as readline from 'node:readline';
 import type { CLIOptions, FileInfoEntry } from './types';
 import { COLORS, DEFAULT_EXCLUDES } from './constants';
 import { logger, setupCLI, setQuietMode, isQuietMode } from './cli';
