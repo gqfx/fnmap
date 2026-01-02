@@ -1,5 +1,8 @@
 # fnmap
 
+[![npm version](https://img.shields.io/npm/v/@didnhdj/fnmap.svg)](https://www.npmjs.com/package/@didnhdj/fnmap)
+[![npm downloads](https://img.shields.io/npm/dm/@didnhdj/fnmap.svg)](https://www.npmjs.com/package/@didnhdj/fnmap)
+
 > AI code indexing tool for analyzing JS/TS code structure and generating structured code maps
 
 [中文文档](./README_CN.md)

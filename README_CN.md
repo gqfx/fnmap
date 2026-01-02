@@ -1,5 +1,8 @@
 # fnmap
 
+[![npm version](https://img.shields.io/npm/v/@didnhdj/fnmap.svg)](https://www.npmjs.com/package/@didnhdj/fnmap)
+[![npm downloads](https://img.shields.io/npm/dm/@didnhdj/fnmap.svg)](https://www.npmjs.com/package/@didnhdj/fnmap)
+
 > AI 代码索引生成工具，分析 JS/TS 代码结构，生成结构化代码映射
 
 [English Documentation](./README.md)
