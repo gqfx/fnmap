@@ -12,7 +12,6 @@
 - 🚀 **Fast Analysis**: Quickly analyze JavaScript/TypeScript code structure using AST
 - 📊 **Structured Output**: Generate `.fnmap` index files with imports, functions, classes, and constants
 - 🔗 **Call Graph**: Track function call relationships and dependencies
-- 📈 **Mermaid Diagrams**: Generate visual call graphs in Mermaid format
 - 🎯 **Git Integration**: Process only changed files for efficient workflows
 - ⚙️ **Flexible Configuration**: Support for multiple configuration methods
 - 🔌 **Pre-commit Hook**: Integrate seamlessly with git hooks
@@ -58,17 +57,13 @@ fnmap --files index.js,utils.js
 fnmap --changed
 
 # Process git staged files (for pre-commit hook)
-fnmap --staged -q
-```
+fnmap --staged
 
-### Generate Call Graphs
+# Show detailed processing logs
+fnmap --log --dir src
 
-```bash
-# Generate file-level Mermaid diagrams
-fnmap --mermaid file --dir src
-
-# Generate project-level Mermaid diagram
-fnmap --mermaid project
+# Clear generated files
+fnmap --clear
 ```
 
 ## Configuration
@@ -136,25 +131,6 @@ The `.fnmap` file contains structured information about your code:
 - `  +methodName(params) line description →calls` - Static method
 - `CONSTANT_NAME line description` - Constant definition
 
-### Mermaid Call Graph
-
-When using `--mermaid` option, generates visual call graphs:
-
-**File-level** (`filename.mermaid`):
-```mermaid
-flowchart TD
-  subgraph utils["utils"]
-    readConfig["readConfig"]
-    parseData["parseData"]
-    saveFile["saveFile"]
-  end
-  readConfig --> parseData
-  saveFile --> parseData
-```
-
-**Project-level** (`.fnmap.mermaid`):
-Shows call relationships across all files in the project.
-
 ## CLI Options
 
 ```
@@ -162,14 +138,15 @@ Usage: fnmap [options] [files...]
 
 Options:
   -v, --version          Show version number
-  -f, --files <files>    Process specific files (comma-separated, generates separate .fnmap for each)
+  -f, --files <files>    Process specified files (comma-separated)
   -d, --dir <dir>        Process all code files in directory
   -p, --project <dir>    Specify project root directory (default: current directory)
-  -c, --changed          Process git changed files (staged + modified + untracked)
-  -s, --staged           Process git staged files (for pre-commit hook)
+  -c, --changed          Process only git changed files (staged + modified + untracked)
+  -s, --staged           Process only git staged files (for pre-commit hook)
   -m, --mermaid [mode]   Generate Mermaid call graph (file=file-level, project=project-level)
-  -q, --quiet            Quiet mode (suppress output)
-  --init                 Create default configuration file and append docs to CLAUDE.md/AGENTS.md
+  -l, --log              Show detailed processing logs
+  --init                 Create default config file and setup project (interactive)
+  --clear                Clear generated files (.fnmap, *.fnmap, *.mermaid)
   -h, --help             Display help information
 ```
 
@@ -248,7 +225,7 @@ Add to `.husky/pre-commit` or `.git/hooks/pre-commit`:
 
 ```bash
 #!/bin/sh
-fnmap --staged -q
+fnmap --staged
 git add .fnmap
 ```
 
@@ -271,17 +248,8 @@ This automatically updates the `.fnmap` index when committing code.
 # Generate index for changed files
 fnmap --changed
 
-# Generate call graph for review
-fnmap --mermaid file --changed
-```
-
-### 4. Documentation Generation
-
-```bash
-# Generate project-level call graph
-fnmap --mermaid project
-
-# Use the .fnmap.mermaid file in your documentation
+# Show detailed logs during analysis
+fnmap --log --changed
 ```
 
 ## Supported File Types
@@ -335,17 +303,14 @@ Complete! Analyzed: 1, Failed: 0
 ==================================================
 ```
 
-### Example 2: Analyze Directory with Call Graph
+### Example 2: Analyze Directory
 
 ```bash
-fnmap --dir src --mermaid file
+fnmap --dir src
 ```
 
 Generates:
-- `src/.fnmap` - Code index
-- `src/utils.mermaid` - Call graph for utils.js
-- `src/parser.mermaid` - Call graph for parser.js
-- etc.
+- `src/.fnmap` - Code index for all files in src directory
 
 ### Example 3: Git Workflow
 
@@ -354,7 +319,7 @@ Generates:
 git add .
 
 # Generate index for staged files
-fnmap --staged -q
+fnmap --staged
 
 # Add updated index
 git add .fnmap

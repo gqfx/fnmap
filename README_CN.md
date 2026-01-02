@@ -12,7 +12,6 @@
 - 🚀 **快速分析**：使用 AST 快速分析 JavaScript/TypeScript 代码结构
 - 📊 **结构化输出**：生成包含导入、函数、类、常量的 `.fnmap` 索引文件
 - 🔗 **调用图谱**：追踪函数调用关系和依赖
-- 📈 **Mermaid 图表**：生成 Mermaid 格式的可视化调用图
 - 🎯 **Git 集成**：只处理改动的文件，提高工作效率
 - ⚙️ **灵活配置**：支持多种配置方式
 - 🔌 **Pre-commit Hook**：无缝集成 git hooks
@@ -58,17 +57,13 @@ fnmap --files index.js,utils.js
 fnmap --changed
 
 # 处理 git staged 文件（用于 pre-commit hook）
-fnmap --staged -q
-```
+fnmap --staged
 
-### 生成调用图
+# 显示详细处理日志
+fnmap --log --dir src
 
-```bash
-# 生成文件级 Mermaid 图表
-fnmap --mermaid file --dir src
-
-# 生成项目级 Mermaid 图表
-fnmap --mermaid project
+# 清理生成的文件
+fnmap --clear
 ```
 
 ## 配置
@@ -136,25 +131,6 @@ fnmap 支持多种配置方式（按优先级排序）：
 - `  +methodName(params) line description →calls` - 静态方法
 - `CONSTANT_NAME line description` - 常量定义
 
-### Mermaid 调用图
-
-使用 `--mermaid` 选项时，生成可视化调用图：
-
-**文件级** (`filename.mermaid`)：
-```mermaid
-flowchart TD
-  subgraph utils["utils"]
-    readConfig["readConfig"]
-    parseData["parseData"]
-    saveFile["saveFile"]
-  end
-  readConfig --> parseData
-  saveFile --> parseData
-```
-
-**项目级** (`.fnmap.mermaid`)：
-显示项目中所有文件的调用关系。
-
 ## CLI 选项
 
 ```
@@ -162,14 +138,15 @@ flowchart TD
 
 选项:
   -v, --version          显示版本号
-  -f, --files <files>    处理指定文件（逗号分隔，为每个文件生成单独的 .fnmap）
+  -f, --files <files>    处理指定文件（逗号分隔）
   -d, --dir <dir>        处理目录下所有代码文件
   -p, --project <dir>    指定项目根目录（默认：当前目录）
   -c, --changed          处理 git 改动的文件（staged + modified + untracked）
   -s, --staged           处理 git staged 文件（用于 pre-commit hook）
   -m, --mermaid [mode]   生成 Mermaid 调用图（file=文件级，project=项目级）
-  -q, --quiet            静默模式（不输出信息）
-  --init                 创建默认配置文件并追加文档到 CLAUDE.md/AGENTS.md
+  -l, --log              显示详细处理日志
+  --init                 创建默认配置文件并设置项目（交互式）
+  --clear                清理生成的文件（.fnmap、*.fnmap、*.mermaid）
   -h, --help             显示帮助信息
 ```
 
@@ -248,7 +225,7 @@ interface FileInfo {
 
 ```bash
 #!/bin/sh
-fnmap --staged -q
+fnmap --staged
 git add .fnmap
 ```
 
@@ -271,17 +248,8 @@ git add .fnmap
 # 为改动的文件生成索引
 fnmap --changed
 
-# 生成调用图用于审查
-fnmap --mermaid file --changed
-```
-
-### 4. 文档生成
-
-```bash
-# 生成项目级调用图
-fnmap --mermaid project
-
-# 在文档中使用 .fnmap.mermaid 文件
+# 分析时显示详细日志
+fnmap --log --changed
 ```
 
 ## 支持的文件类型
@@ -335,17 +303,14 @@ Complete! Analyzed: 1, Failed: 0
 ==================================================
 ```
 
-### 示例 2：分析目录并生成调用图
+### 示例 2：分析目录
 
 ```bash
-fnmap --dir src --mermaid file
+fnmap --dir src
 ```
 
 生成：
-- `src/.fnmap` - 代码索引
-- `src/utils.mermaid` - utils.js 的调用图
-- `src/parser.mermaid` - parser.js 的调用图
-- 等等
+- `src/.fnmap` - src 目录下所有文件的代码索引
 
 ### 示例 3：Git 工作流
 
@@ -354,7 +319,7 @@ fnmap --dir src --mermaid file
 git add .
 
 # 为 staged 文件生成索引
-fnmap --staged -q
+fnmap --staged
 
 # 添加更新的索引
 git add .fnmap
