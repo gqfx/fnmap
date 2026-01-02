@@ -13,6 +13,9 @@
 - 🎯 **Git 集成**：只处理改动的文件，提高工作效率
 - ⚙️ **灵活配置**：支持多种配置方式
 - 🔌 **Pre-commit Hook**：无缝集成 git hooks
+- 📦 **编程接口**：可作为库直接处理代码字符串
+- 🎨 **智能过滤**：自动跳过类型定义文件和纯类型文件
+- 🌍 **跨平台支持**：支持 Windows、macOS 和 Linux 的路径规范化
 
 ## 安装
 
@@ -34,7 +37,7 @@ npm install --save-dev @didnhdj/fnmap
 fnmap --init
 ```
 
-这会在项目根目录创建 `.fnmaprc` 配置文件。
+这会在项目根目录创建 `.fnmaprc` 配置文件，并自动追加 fnmap 文档到 `CLAUDE.md` 或 `AGENTS.md`（如果存在，方便 AI 助手理解）。
 
 ### 基本用法
 
@@ -156,15 +159,82 @@ flowchart TD
 
 选项:
   -v, --version          显示版本号
-  -f, --files <files>    处理指定文件（逗号分隔）
+  -f, --files <files>    处理指定文件（逗号分隔，为每个文件生成单独的 .fnmap）
   -d, --dir <dir>        处理目录下所有代码文件
   -p, --project <dir>    指定项目根目录（默认：当前目录）
   -c, --changed          处理 git 改动的文件（staged + modified + untracked）
   -s, --staged           处理 git staged 文件（用于 pre-commit hook）
   -m, --mermaid [mode]   生成 Mermaid 调用图（file=文件级，project=项目级）
   -q, --quiet            静默模式（不输出信息）
-  --init                 创建默认配置文件 .fnmaprc
+  --init                 创建默认配置文件并追加文档到 CLAUDE.md/AGENTS.md
   -h, --help             显示帮助信息
+```
+
+## 编程接口
+
+fnmap 可以作为库在 Node.js 应用中使用。
+
+### 处理代码字符串
+
+```typescript
+import { processCode } from '@didnhdj/fnmap';
+
+const code = `
+  export function hello(name) {
+    console.log('Hello, ' + name);
+  }
+`;
+
+const result = processCode(code, { filePath: 'example.js' });
+
+if (result.success) {
+  console.log('函数:', result.info.functions);
+  console.log('导入:', result.info.imports);
+  console.log('调用图:', result.info.callGraph);
+} else {
+  console.error('解析错误:', result.error);
+}
+```
+
+### 处理文件
+
+```typescript
+import { processFile } from '@didnhdj/fnmap';
+
+const result = processFile('./src/utils.js');
+
+if (result.success) {
+  console.log('分析结果:', result.info);
+}
+```
+
+### API 类型定义
+
+```typescript
+// 处理结果类型
+type ProcessResult = ProcessSuccess | ProcessFailure;
+
+interface ProcessSuccess {
+  success: true;
+  info: FileInfo;
+}
+
+interface ProcessFailure {
+  success: false;
+  error: string;
+  errorType: ErrorType;
+  loc?: { line: number; column: number };
+}
+
+// 文件信息结构
+interface FileInfo {
+  imports: ImportInfo[];
+  functions: FunctionInfo[];
+  classes: ClassInfo[];
+  constants: ConstantInfo[];
+  callGraph: CallGraph;
+  isPureTypeFile: boolean;  // 文件是否仅包含类型定义
+}
 ```
 
 ## 使用场景
@@ -219,12 +289,15 @@ fnmap --mermaid project
 - `.tsx` - React TypeScript
 - `.mjs` - ES Modules
 
+**自动过滤的文件：**
+- `.d.ts`、`.d.tsx`、`.d.mts` - 类型定义文件
+- 仅包含 `type` 或 `interface` 声明的纯类型文件
+
 ## 限制
 
 为了保证性能和安全，fnmap 有以下默认限制：
 - **文件大小**：单个文件最大支持 10MB
 - **目录深度**：最大递归深度为 50 层
-- **超时**：目前没有硬性超时限制，但处理超大文件可能会较慢
 
 ## 工作原理
 
@@ -252,7 +325,7 @@ Analyzing: src/utils.js
 ✓ Imports: 3, Functions: 5, Classes: 0, Constants: 2
 
 Generating .fnmap index...
-✓ src/.fnmap
+✓ src/utils.fnmap
 
 ==================================================
 Complete! Analyzed: 1, Failed: 0
