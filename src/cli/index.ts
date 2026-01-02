@@ -44,7 +44,14 @@ export function isQuietMode(): boolean {
 export function getVersion(): string {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pkg = require('../../package.json') as { version: string };
+    // 构建后 dist/index.js -> ../package.json
+    // 开发时 src/cli/index.ts -> ../../package.json
+    let pkg: { version: string };
+    try {
+      pkg = require('../../package.json') as { version: string };
+    } catch {
+      pkg = require('../package.json') as { version: string };
+    }
     return pkg.version;
   } catch {
     return '0.1.0';
