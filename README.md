@@ -13,6 +13,9 @@
 - 🎯 **Git Integration**: Process only changed files for efficient workflows
 - ⚙️ **Flexible Configuration**: Support for multiple configuration methods
 - 🔌 **Pre-commit Hook**: Integrate seamlessly with git hooks
+- 📦 **Programmatic API**: Use as a library to process code strings directly
+- 🎨 **Smart Filtering**: Automatically skip type definition files and type-only files
+- 🌍 **Cross-Platform**: Normalized path handling for Windows, macOS, and Linux
 
 ## Installation
 
@@ -34,7 +37,7 @@ npm install --save-dev @didnhdj/fnmap
 fnmap --init
 ```
 
-This creates a `.fnmaprc` configuration file in your project root.
+This creates a `.fnmaprc` configuration file in your project root and automatically appends fnmap documentation to `CLAUDE.md` or `AGENTS.md` if they exist (useful for AI assistants).
 
 ### Basic Usage
 
@@ -156,15 +159,82 @@ Usage: fnmap [options] [files...]
 
 Options:
   -v, --version          Show version number
-  -f, --files <files>    Process specific files (comma-separated)
+  -f, --files <files>    Process specific files (comma-separated, generates separate .fnmap for each)
   -d, --dir <dir>        Process all code files in directory
   -p, --project <dir>    Specify project root directory (default: current directory)
   -c, --changed          Process git changed files (staged + modified + untracked)
   -s, --staged           Process git staged files (for pre-commit hook)
   -m, --mermaid [mode]   Generate Mermaid call graph (file=file-level, project=project-level)
   -q, --quiet            Quiet mode (suppress output)
-  --init                 Create default configuration file .fnmaprc
+  --init                 Create default configuration file and append docs to CLAUDE.md/AGENTS.md
   -h, --help             Display help information
+```
+
+## Programmatic API
+
+fnmap can be used as a library in your Node.js applications.
+
+### Processing Code Strings
+
+```typescript
+import { processCode } from '@didnhdj/fnmap';
+
+const code = `
+  export function hello(name) {
+    console.log('Hello, ' + name);
+  }
+`;
+
+const result = processCode(code, { filePath: 'example.js' });
+
+if (result.success) {
+  console.log('Functions:', result.info.functions);
+  console.log('Imports:', result.info.imports);
+  console.log('Call Graph:', result.info.callGraph);
+} else {
+  console.error('Parse error:', result.error);
+}
+```
+
+### Processing Files
+
+```typescript
+import { processFile } from '@didnhdj/fnmap';
+
+const result = processFile('./src/utils.js');
+
+if (result.success) {
+  console.log('Analysis result:', result.info);
+}
+```
+
+### API Types
+
+```typescript
+// Process result type
+type ProcessResult = ProcessSuccess | ProcessFailure;
+
+interface ProcessSuccess {
+  success: true;
+  info: FileInfo;
+}
+
+interface ProcessFailure {
+  success: false;
+  error: string;
+  errorType: ErrorType;
+  loc?: { line: number; column: number };
+}
+
+// File info structure
+interface FileInfo {
+  imports: ImportInfo[];
+  functions: FunctionInfo[];
+  classes: ClassInfo[];
+  constants: ConstantInfo[];
+  callGraph: CallGraph;
+  isPureTypeFile: boolean;  // Whether file only contains type definitions
+}
 ```
 
 ## Use Cases
@@ -219,6 +289,10 @@ fnmap --mermaid project
 - `.tsx` - React TypeScript
 - `.mjs` - ES Modules
 
+**Auto-filtered files:**
+- `.d.ts`, `.d.tsx`, `.d.mts` - Type definition files
+- Files containing only `type` or `interface` declarations (pure type files)
+
 ## Limitations
 
 To ensure performance and safety, fnmap has the following default limits:
@@ -251,7 +325,7 @@ Analyzing: src/utils.js
 ✓ Imports: 3, Functions: 5, Classes: 0, Constants: 2
 
 Generating .fnmap index...
-✓ src/.fnmap
+✓ src/utils.fnmap
 
 ==================================================
 Complete! Analyzed: 1, Failed: 0
