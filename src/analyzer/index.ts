@@ -106,6 +106,23 @@ export function analyzeFile(code: unknown, filePath: string | null): AnalyzeResu
   const localToModule = new Map<string, string>();
   const usageMap = new Map<string, Set<string>>();
 
+  // 辅助函数：提取 superClass 名称（支持 Identifier 和 MemberExpression）
+  function getSuperClassName(superClass: t.Node | null | undefined): string | null {
+    if (!superClass) return null;
+    if (superClass.type === 'Identifier') {
+      return superClass.name;
+    }
+    // 处理 React.Component 这种 MemberExpression
+    if (superClass.type === 'MemberExpression') {
+      const obj = superClass.object;
+      const prop = superClass.property;
+      if (obj.type === 'Identifier' && prop.type === 'Identifier') {
+        return obj.name; // 返回 React（而不是 React.Component）
+      }
+    }
+    return null;
+  }
+
   // 辅助函数：获取当前所在的函数/方法名
   function getEnclosingFunctionName(nodePath: NodePath): string | null {
     let current: NodePath | null = nodePath;
@@ -242,6 +259,9 @@ export function analyzeFile(code: unknown, filePath: string | null): AnalyzeResu
     },
 
     FunctionDeclaration(nodePath: NodePath<t.FunctionDeclaration>) {
+      // 跳过 export default function，由 ExportDefaultDeclaration 处理
+      if (nodePath.parent.type === 'ExportDefaultDeclaration') return;
+
       const node = nodePath.node;
       const name = node.id?.name ?? '[anonymous]';
       const params = node.params.map((p) => {
@@ -265,11 +285,14 @@ export function analyzeFile(code: unknown, filePath: string | null): AnalyzeResu
     },
 
     ClassDeclaration(nodePath: NodePath<t.ClassDeclaration>) {
+      // 跳过 export default class，由 ExportDefaultDeclaration 处理
+      if (nodePath.parent.type === 'ExportDefaultDeclaration') return;
+
       const node = nodePath.node;
       const name = node.id?.name ?? '[anonymous]';
       const startLine = node.loc?.start?.line ?? 0;
       const endLine = node.loc?.end?.line ?? 0;
-      const superClass = node.superClass?.type === 'Identifier' ? node.superClass.name : null;
+      const superClass = getSuperClassName(node.superClass);
 
       const desc = extractJSDocDescription(getLeadingComment(node, nodePath.parent));
 
@@ -350,6 +373,116 @@ export function analyzeFile(code: unknown, filePath: string | null): AnalyzeResu
           continue;
         }
 
+        // 检测类表达式: const Foo = class {} 或 const Foo = class Named {}
+        if (decl.init?.type === 'ClassExpression') {
+          const classExpr = decl.init as t.ClassExpression;
+          const startLine = node.loc?.start?.line ?? 0;
+          const endLine = node.loc?.end?.line ?? 0;
+          const superClass = getSuperClassName(classExpr.superClass);
+
+          const methods: MethodInfo[] = [];
+          if (classExpr.body?.body) {
+            for (const member of classExpr.body.body) {
+              if (member.type === 'ClassMethod') {
+                const methodName = member.key?.type === 'Identifier' ? member.key.name : '[computed]';
+                const methodParams = member.params.map((p) => {
+                  if (p.type === 'Identifier') return p.name;
+                  if (p.type === 'AssignmentPattern' && p.left?.type === 'Identifier') return p.left.name + '?';
+                  return '?';
+                });
+                const methodLine = member.loc?.start?.line ?? 0;
+
+                let methodDesc = '';
+                const methodComments = member.leadingComments;
+                if (methodComments && methodComments.length > 0) {
+                  methodDesc = extractJSDocDescription(methodComments[methodComments.length - 1]);
+                }
+
+                methods.push({
+                  name: methodName,
+                  params: methodParams.join(','),
+                  line: methodLine,
+                  static: member.static,
+                  kind: member.kind as MethodInfo['kind'],
+                  description: methodDesc
+                });
+              }
+            }
+          }
+
+          info.classes.push({
+            name,
+            superClass,
+            startLine,
+            endLine,
+            methods,
+            description: desc
+          } as ClassInfo);
+          continue;
+        }
+
+        // 检测对象字面量中的方法: const obj = { method() {}, arrow: () => {} }
+        if (decl.init?.type === 'ObjectExpression') {
+          const objExpr = decl.init as t.ObjectExpression;
+          for (const prop of objExpr.properties) {
+            // 方法简写: { method() {} }
+            if (prop.type === 'ObjectMethod') {
+              const methodName = prop.key?.type === 'Identifier' ? `${name}.${prop.key.name}` : `${name}.[computed]`;
+              const methodParams = prop.params.map((p) => {
+                if (p.type === 'Identifier') return p.name;
+                if (p.type === 'AssignmentPattern' && p.left?.type === 'Identifier') return p.left.name + '?';
+                if (p.type === 'RestElement' && p.argument?.type === 'Identifier') return '...' + p.argument.name;
+                return '?';
+              });
+              const startLine = prop.loc?.start?.line ?? 0;
+              const endLine = prop.loc?.end?.line ?? 0;
+
+              let methodDesc = '';
+              if (prop.leadingComments && prop.leadingComments.length > 0) {
+                methodDesc = extractJSDocDescription(prop.leadingComments[prop.leadingComments.length - 1]);
+              }
+
+              info.functions.push({
+                name: methodName,
+                params: methodParams.join(','),
+                startLine,
+                endLine,
+                description: methodDesc
+              } as FunctionInfo);
+            }
+            // 属性值为函数: { arrow: () => {}, func: function() {} }
+            else if (
+              prop.type === 'ObjectProperty' &&
+              prop.key?.type === 'Identifier' &&
+              (prop.value?.type === 'ArrowFunctionExpression' || prop.value?.type === 'FunctionExpression')
+            ) {
+              const funcExpr = prop.value as t.ArrowFunctionExpression | t.FunctionExpression;
+              const methodName = `${name}.${prop.key.name}`;
+              const methodParams = funcExpr.params.map((p) => {
+                if (p.type === 'Identifier') return p.name;
+                if (p.type === 'AssignmentPattern' && p.left?.type === 'Identifier') return p.left.name + '?';
+                if (p.type === 'RestElement' && p.argument?.type === 'Identifier') return '...' + p.argument.name;
+                return '?';
+              });
+              const startLine = prop.loc?.start?.line ?? 0;
+              const endLine = prop.loc?.end?.line ?? 0;
+
+              let methodDesc = '';
+              if (prop.leadingComments && prop.leadingComments.length > 0) {
+                methodDesc = extractJSDocDescription(prop.leadingComments[prop.leadingComments.length - 1]);
+              }
+
+              info.functions.push({
+                name: methodName,
+                params: methodParams.join(','),
+                startLine,
+                endLine,
+                description: methodDesc
+              } as FunctionInfo);
+            }
+          }
+        }
+
         // 全大写常量: const MAX_SIZE = 100
         if (node.kind === 'const' && name === name.toUpperCase() && name.length > 2) {
           const startLine = node.loc?.start?.line ?? 0;
@@ -358,6 +491,292 @@ export function analyzeFile(code: unknown, filePath: string | null): AnalyzeResu
             line: startLine,
             description: desc
           } as ConstantInfo);
+        }
+      }
+    },
+
+    // 默认导出: export default function() {} / export default class {} / export default () => {}
+    ExportDefaultDeclaration(nodePath: NodePath<t.ExportDefaultDeclaration>) {
+      const node = nodePath.node;
+      const decl = node.declaration;
+      const desc = extractJSDocDescription(getLeadingComment(node, nodePath.parent));
+
+      // export default function foo() {} 或 export default function() {}
+      if (decl.type === 'FunctionDeclaration') {
+        const funcDecl = decl as t.FunctionDeclaration;
+        const name = funcDecl.id?.name ?? '[default]';
+        const params = funcDecl.params.map((p) => {
+          if (p.type === 'Identifier') return p.name;
+          if (p.type === 'AssignmentPattern' && p.left?.type === 'Identifier') return p.left.name + '?';
+          if (p.type === 'RestElement' && p.argument?.type === 'Identifier') return '...' + p.argument.name;
+          return '?';
+        });
+        const startLine = node.loc?.start?.line ?? 0;
+        const endLine = node.loc?.end?.line ?? 0;
+
+        info.functions.push({
+          name,
+          params: params.join(','),
+          startLine,
+          endLine,
+          description: desc
+        } as FunctionInfo);
+        return;
+      }
+
+      // export default class Foo {} 或 export default class {}
+      if (decl.type === 'ClassDeclaration') {
+        const classDecl = decl as t.ClassDeclaration;
+        const name = classDecl.id?.name ?? '[default]';
+        const startLine = node.loc?.start?.line ?? 0;
+        const endLine = node.loc?.end?.line ?? 0;
+        const superClass = getSuperClassName(classDecl.superClass);
+
+        const methods: MethodInfo[] = [];
+        if (classDecl.body?.body) {
+          for (const member of classDecl.body.body) {
+            if (member.type === 'ClassMethod') {
+              const methodName = member.key?.type === 'Identifier' ? member.key.name : '[computed]';
+              const methodParams = member.params.map((p) => {
+                if (p.type === 'Identifier') return p.name;
+                if (p.type === 'AssignmentPattern' && p.left?.type === 'Identifier') return p.left.name + '?';
+                return '?';
+              });
+              const methodLine = member.loc?.start?.line ?? 0;
+
+              let methodDesc = '';
+              const methodComments = member.leadingComments;
+              if (methodComments && methodComments.length > 0) {
+                methodDesc = extractJSDocDescription(methodComments[methodComments.length - 1]);
+              }
+
+              methods.push({
+                name: methodName,
+                params: methodParams.join(','),
+                line: methodLine,
+                static: member.static,
+                kind: member.kind as MethodInfo['kind'],
+                description: methodDesc
+              });
+            }
+          }
+        }
+
+        info.classes.push({
+          name,
+          superClass,
+          startLine,
+          endLine,
+          methods,
+          description: desc
+        } as ClassInfo);
+        return;
+      }
+
+      // export default () => {} 或 export default async () => {}
+      if (decl.type === 'ArrowFunctionExpression' || decl.type === 'FunctionExpression') {
+        const funcExpr = decl as t.ArrowFunctionExpression | t.FunctionExpression;
+        const name = funcExpr.type === 'FunctionExpression' && funcExpr.id?.name ? funcExpr.id.name : '[default]';
+        const params = funcExpr.params.map((p) => {
+          if (p.type === 'Identifier') return p.name;
+          if (p.type === 'AssignmentPattern' && p.left?.type === 'Identifier') return p.left.name + '?';
+          if (p.type === 'RestElement' && p.argument?.type === 'Identifier') return '...' + p.argument.name;
+          return '?';
+        });
+        const startLine = node.loc?.start?.line ?? 0;
+        const endLine = node.loc?.end?.line ?? 0;
+
+        info.functions.push({
+          name,
+          params: params.join(','),
+          startLine,
+          endLine,
+          description: desc
+        } as FunctionInfo);
+        return;
+      }
+
+      // export default class {}（类表达式）
+      if (decl.type === 'ClassExpression') {
+        const classExpr = decl as t.ClassExpression;
+        const name = classExpr.id?.name ?? '[default]';
+        const startLine = node.loc?.start?.line ?? 0;
+        const endLine = node.loc?.end?.line ?? 0;
+        const superClass = classExpr.superClass?.type === 'Identifier' ? classExpr.superClass.name : null;
+
+        const methods: MethodInfo[] = [];
+        if (classExpr.body?.body) {
+          for (const member of classExpr.body.body) {
+            if (member.type === 'ClassMethod') {
+              const methodName = member.key?.type === 'Identifier' ? member.key.name : '[computed]';
+              const methodParams = member.params.map((p) => {
+                if (p.type === 'Identifier') return p.name;
+                if (p.type === 'AssignmentPattern' && p.left?.type === 'Identifier') return p.left.name + '?';
+                return '?';
+              });
+              const methodLine = member.loc?.start?.line ?? 0;
+
+              let methodDesc = '';
+              const methodComments = member.leadingComments;
+              if (methodComments && methodComments.length > 0) {
+                methodDesc = extractJSDocDescription(methodComments[methodComments.length - 1]);
+              }
+
+              methods.push({
+                name: methodName,
+                params: methodParams.join(','),
+                line: methodLine,
+                static: member.static,
+                kind: member.kind as MethodInfo['kind'],
+                description: methodDesc
+              });
+            }
+          }
+        }
+
+        info.classes.push({
+          name,
+          superClass,
+          startLine,
+          endLine,
+          methods,
+          description: desc
+        } as ClassInfo);
+      }
+    },
+
+    // CommonJS 导出: module.exports = function() {} / exports.foo = () => {}
+    AssignmentExpression(nodePath: NodePath<t.AssignmentExpression>) {
+      const node = nodePath.node;
+      // 只处理顶层赋值
+      if (nodePath.parent.type !== 'ExpressionStatement') return;
+      const grandParent = nodePath.parentPath?.parent;
+      if (grandParent?.type !== 'Program') return;
+
+      const left = node.left;
+      const right = node.right;
+
+      // module.exports = function() {} 或 module.exports = () => {}
+      if (
+        left.type === 'MemberExpression' &&
+        left.object?.type === 'Identifier' &&
+        left.object.name === 'module' &&
+        left.property?.type === 'Identifier' &&
+        left.property.name === 'exports'
+      ) {
+        const desc = extractJSDocDescription(getLeadingComment(nodePath.parent as t.Node, grandParent));
+
+        if (right.type === 'FunctionExpression' || right.type === 'ArrowFunctionExpression') {
+          const funcExpr = right as t.FunctionExpression | t.ArrowFunctionExpression;
+          const name = right.type === 'FunctionExpression' && (right as t.FunctionExpression).id?.name
+            ? (right as t.FunctionExpression).id!.name
+            : '[exports]';
+          const params = funcExpr.params.map((p) => {
+            if (p.type === 'Identifier') return p.name;
+            if (p.type === 'AssignmentPattern' && p.left?.type === 'Identifier') return p.left.name + '?';
+            if (p.type === 'RestElement' && p.argument?.type === 'Identifier') return '...' + p.argument.name;
+            return '?';
+          });
+          const startLine = node.loc?.start?.line ?? 0;
+          const endLine = node.loc?.end?.line ?? 0;
+
+          info.functions.push({
+            name,
+            params: params.join(','),
+            startLine,
+            endLine,
+            description: desc
+          } as FunctionInfo);
+          return;
+        }
+
+        if (right.type === 'ClassExpression') {
+          const classExpr = right as t.ClassExpression;
+          const name = classExpr.id?.name ?? '[exports]';
+          const startLine = node.loc?.start?.line ?? 0;
+          const endLine = node.loc?.end?.line ?? 0;
+          const superClass = getSuperClassName(classExpr.superClass);
+
+          const methods: MethodInfo[] = [];
+          if (classExpr.body?.body) {
+            for (const member of classExpr.body.body) {
+              if (member.type === 'ClassMethod') {
+                const methodName = member.key?.type === 'Identifier' ? member.key.name : '[computed]';
+                const methodParams = member.params.map((p) => {
+                  if (p.type === 'Identifier') return p.name;
+                  if (p.type === 'AssignmentPattern' && p.left?.type === 'Identifier') return p.left.name + '?';
+                  return '?';
+                });
+                const methodLine = member.loc?.start?.line ?? 0;
+                methods.push({
+                  name: methodName,
+                  params: methodParams.join(','),
+                  line: methodLine,
+                  static: member.static,
+                  kind: member.kind as MethodInfo['kind'],
+                  description: ''
+                });
+              }
+            }
+          }
+
+          info.classes.push({
+            name,
+            superClass,
+            startLine,
+            endLine,
+            methods,
+            description: desc
+          } as ClassInfo);
+          return;
+        }
+      }
+
+      // exports.foo = function() {} 或 module.exports.foo = () => {}
+      if (
+        left.type === 'MemberExpression' &&
+        left.property?.type === 'Identifier'
+      ) {
+        const propName = left.property.name;
+        let isExports = false;
+
+        // exports.foo
+        if (left.object?.type === 'Identifier' && left.object.name === 'exports') {
+          isExports = true;
+        }
+        // module.exports.foo
+        if (
+          left.object?.type === 'MemberExpression' &&
+          left.object.object?.type === 'Identifier' &&
+          left.object.object.name === 'module' &&
+          left.object.property?.type === 'Identifier' &&
+          left.object.property.name === 'exports'
+        ) {
+          isExports = true;
+        }
+
+        if (isExports) {
+          const desc = extractJSDocDescription(getLeadingComment(nodePath.parent as t.Node, grandParent));
+
+          if (right.type === 'FunctionExpression' || right.type === 'ArrowFunctionExpression') {
+            const funcExpr = right as t.FunctionExpression | t.ArrowFunctionExpression;
+            const params = funcExpr.params.map((p) => {
+              if (p.type === 'Identifier') return p.name;
+              if (p.type === 'AssignmentPattern' && p.left?.type === 'Identifier') return p.left.name + '?';
+              if (p.type === 'RestElement' && p.argument?.type === 'Identifier') return '...' + p.argument.name;
+              return '?';
+            });
+            const startLine = node.loc?.start?.line ?? 0;
+            const endLine = node.loc?.end?.line ?? 0;
+
+            info.functions.push({
+              name: propName,
+              params: params.join(','),
+              startLine,
+              endLine,
+              description: desc
+            } as FunctionInfo);
+          }
         }
       }
     }

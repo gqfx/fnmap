@@ -176,6 +176,151 @@ const namedFunc = function calculate(x, y) {
     expect(info.functions[1]!.name).toBe('namedFunc');
   });
 
+  // ========== 默认导出测试 ==========
+
+  it('should handle export default function', () => {
+    const code = `
+/** 默认导出的函数 */
+export default function myDefault(a, b) {
+  return a + b;
+}
+    `;
+    const result = analyzeFile(code, 'default-func.js');
+
+    const info = result as FileInfo;
+    expect(info.functions).toHaveLength(1);
+    expect(info.functions[0]!.name).toBe('myDefault');
+    expect(info.functions[0]!.params).toBe('a,b');
+    expect(info.functions[0]!.description).toContain('默认导出的函数');
+  });
+
+  it('should handle export default anonymous function', () => {
+    const code = `
+export default function() {
+  return 'anonymous';
+}
+    `;
+    const result = analyzeFile(code, 'default-anon.js');
+
+    const info = result as FileInfo;
+    expect(info.functions).toHaveLength(1);
+    expect(info.functions[0]!.name).toBe('[default]');
+  });
+
+  it('should handle export default arrow function', () => {
+    const code = `
+export default (x, y) => x * y;
+    `;
+    const result = analyzeFile(code, 'default-arrow.js');
+
+    const info = result as FileInfo;
+    expect(info.functions).toHaveLength(1);
+    expect(info.functions[0]!.name).toBe('[default]');
+    expect(info.functions[0]!.params).toBe('x,y');
+  });
+
+  it('should handle export default class', () => {
+    const code = `
+export default class MyComponent {
+  render() {
+    return null;
+  }
+}
+    `;
+    const result = analyzeFile(code, 'default-class.js');
+
+    const info = result as FileInfo;
+    expect(info.classes).toHaveLength(1);
+    expect(info.classes[0]!.name).toBe('MyComponent');
+    expect(info.classes[0]!.methods).toHaveLength(1);
+  });
+
+  // ========== 类表达式测试 ==========
+
+  it('should handle class expression', () => {
+    const code = `
+/** React 组件 */
+const MyComponent = class extends React.Component {
+  constructor(props) {
+    super(props);
+  }
+  render() {
+    return null;
+  }
+};
+    `;
+    const result = analyzeFile(code, 'class-expr.js');
+
+    const info = result as FileInfo;
+    expect(info.classes).toHaveLength(1);
+    expect(info.classes[0]!.name).toBe('MyComponent');
+    expect(info.classes[0]!.superClass).toBe('React');
+    expect(info.classes[0]!.methods).toHaveLength(2);
+    expect(info.classes[0]!.description).toContain('React 组件');
+  });
+
+  // ========== CommonJS 导出测试 ==========
+
+  it('should handle module.exports function', () => {
+    const code = `
+/** 主模块导出 */
+module.exports = function(options) {
+  return options;
+};
+    `;
+    const result = analyzeFile(code, 'commonjs.js');
+
+    const info = result as FileInfo;
+    expect(info.functions).toHaveLength(1);
+    expect(info.functions[0]!.name).toBe('[exports]');
+    expect(info.functions[0]!.params).toBe('options');
+    expect(info.functions[0]!.description).toContain('主模块导出');
+  });
+
+  it('should handle exports.name function', () => {
+    const code = `
+/** 加法函数 */
+exports.add = function(a, b) {
+  return a + b;
+};
+
+/** 减法函数 */
+exports.subtract = (a, b) => a - b;
+    `;
+    const result = analyzeFile(code, 'exports.js');
+
+    const info = result as FileInfo;
+    expect(info.functions).toHaveLength(2);
+    expect(info.functions[0]!.name).toBe('add');
+    expect(info.functions[1]!.name).toBe('subtract');
+  });
+
+  // ========== 对象方法测试 ==========
+
+  it('should handle object methods', () => {
+    const code = `
+const utils = {
+  /** 格式化日期 */
+  formatDate(date) {
+    return date.toISOString();
+  },
+  /** 解析 JSON */
+  parseJSON: (str) => JSON.parse(str),
+  regularFunc: function(x) {
+    return x * 2;
+  }
+};
+    `;
+    const result = analyzeFile(code, 'object-methods.js');
+
+    const info = result as FileInfo;
+    expect(info.functions).toHaveLength(3);
+    expect(info.functions[0]!.name).toBe('utils.formatDate');
+    expect(info.functions[0]!.params).toBe('date');
+    expect(info.functions[1]!.name).toBe('utils.parseJSON');
+    expect(info.functions[2]!.name).toBe('utils.regularFunc');
+  });
+
   it('should handle default parameters', () => {
     const code = `
 function withDefaults(a, b = 10, c = 20) {
