@@ -108,6 +108,8 @@ export function main(): void {
 
   // 确定要处理的文件列表
   let filesToProcess: string[] = [];
+  // 标记是否为单文件模式（-f 参数）
+  let singleFileMode = false;
 
   if (options.changed || options.staged) {
     // 基于git改动 - 增量模式
@@ -129,7 +131,8 @@ export function main(): void {
       filesToProcess.push(...dirFiles);
     }
   } else if (fileArgs.length > 0) {
-    // 指定的文件
+    // 指定的文件 - 单文件模式
+    singleFileMode = true;
     filesToProcess = fileArgs.map((f) => (path.isAbsolute(f) ? f : path.resolve(projectDir, f)));
   } else if (options.dir) {
     // 扫描指定目录
@@ -222,15 +225,35 @@ export function main(): void {
   // 生成.fnmap索引文件
   if (dirFilesMap.size > 0) {
     logger.info('\nGenerating .fnmap index...');
-    for (const [dir, filesInfo] of dirFilesMap) {
-      try {
-        const mapContent = generateAiMap(dir, filesInfo);
-        const mapPath = path.join(dir, '.fnmap');
-        fs.writeFileSync(mapPath, mapContent);
-        logger.success(path.relative(projectDir, mapPath));
-      } catch (err) {
-        const error = err as Error;
-        logger.error(`Failed to generate .fnmap for ${path.relative(projectDir, dir)}: ${error.message}`);
+
+    if (singleFileMode) {
+      // 单文件模式：为每个文件生成 filename.fnmap
+      for (const [dir, filesInfo] of dirFilesMap) {
+        for (const { relativePath, info } of filesInfo) {
+          try {
+            const mapContent = generateAiMap(dir, [{ relativePath, info }]);
+            const baseName = path.basename(relativePath, path.extname(relativePath));
+            const mapPath = path.join(dir, `${baseName}.fnmap`);
+            fs.writeFileSync(mapPath, mapContent);
+            logger.success(path.relative(projectDir, mapPath));
+          } catch (err) {
+            const error = err as Error;
+            logger.error(`Failed to generate .fnmap for ${relativePath}: ${error.message}`);
+          }
+        }
+      }
+    } else {
+      // 目录模式：每个目录生成一个 .fnmap
+      for (const [dir, filesInfo] of dirFilesMap) {
+        try {
+          const mapContent = generateAiMap(dir, filesInfo);
+          const mapPath = path.join(dir, '.fnmap');
+          fs.writeFileSync(mapPath, mapContent);
+          logger.success(path.relative(projectDir, mapPath));
+        } catch (err) {
+          const error = err as Error;
+          logger.error(`Failed to generate .fnmap for ${path.relative(projectDir, dir)}: ${error.message}`);
+        }
       }
     }
   }
