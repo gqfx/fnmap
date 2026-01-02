@@ -25,6 +25,7 @@ export type {
   ProcessSuccess,
   ProcessFailure,
   CLIOptions,
+  InitOptions,
   ErrorContext,
   FileInfoEntry
 } from './types';
@@ -36,7 +37,7 @@ export { ErrorTypes, isParseError, isProcessSuccess, isProcessFailure, isValidat
 export { COLORS, SUPPORTED_EXTENSIONS, DEFAULT_EXCLUDES, DEFAULT_CONFIG, MAX_FILE_SIZE, MAX_DIR_DEPTH } from './constants';
 
 // 导出验证函数
-export { validateFilePath, validateConfig, formatError } from './validation';
+export { validateFilePath, validateConfig, formatError, normalizePath, normalizePaths } from './validation';
 
 // 导出配置函数
 export { loadConfig, mergeConfig } from './config';
@@ -63,5 +64,8 @@ export { main };
 
 // CLI 入口
 if (require.main === module) {
-  main();
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
 }

@@ -1,5 +1,7 @@
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
+import readline from 'readline';
 import type { CLIOptions, FileInfoEntry } from './types';
 import { COLORS, DEFAULT_EXCLUDES } from './constants';
 import { logger, setupCLI, setQuietMode } from './cli';
@@ -7,6 +9,7 @@ import { loadConfig, mergeConfig } from './config';
 import { scanDirectory, getGitChangedFiles, scanSingleDirectory } from './scanner';
 import { processFile } from './processor';
 import { generateAiMap, generateFileMermaid, generateProjectMermaid } from './generator';
+import { normalizePath } from './validation';
 
 /** fnmap 格式说明的英文版内容 */
 const FNMAP_DOCS_EN = `
@@ -36,38 +39,244 @@ The \`.fnmap\` file provides a structured code index for quick navigation. Read 
 3. Prefer encapsulating logic in functions rather than writing flat, sequential code
 `;
 
+/** 生成文件的 gitignore 规则 */
+const GITIGNORE_RULES = `
+# fnmap generated files
+.fnmap
+*.fnmap
+*.mermaid
+.fnmap.mermaid
+`;
+
+/** 交互式提问工具 */
+function askQuestion(rl: readline.Interface, question: string): Promise<string> {
+  return new Promise((resolve) => {
+    rl.question(question, (answer) => {
+      resolve(answer.trim());
+    });
+  });
+}
+
 /**
- * 检查目录中是否存在 CLAUDE.md 或 AGENTS.md（忽略大小写），如果存在则追加 fnmap 文档
+ * 递归清理指定目录下的生成文件
  */
-function appendFnmapDocsToAgentFiles(projectDir: string): void {
-  const targetFiles = ['CLAUDE.md', 'AGENTS.md'];
-  const files = fs.readdirSync(projectDir);
+function clearGeneratedFiles(dir: string, projectDir: string): number {
+  let count = 0;
+  const excludeDirs = ['node_modules', '.git', 'dist', 'build', '.next', 'coverage'];
 
-  for (const targetFile of targetFiles) {
-    // 忽略大小写查找匹配的文件
-    const matchedFile = files.find((f) => f.toLowerCase() === targetFile.toLowerCase());
+  if (!fs.existsSync(dir)) {
+    logger.warn(`Directory does not exist: ${dir}`);
+    return 0;
+  }
 
-    if (matchedFile) {
-      const filePath = path.join(projectDir, matchedFile);
-      const content = fs.readFileSync(filePath, 'utf-8');
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
 
-      // 检查是否已经包含 fnmap 文档（避免重复添加）
-      if (content.includes('.fnmap Code Index Format')) {
-        console.log(`${COLORS.yellow}!${COLORS.reset} ${matchedFile} already contains fnmap documentation`);
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+
+    if (entry.isDirectory()) {
+      // 跳过排除的目录
+      if (excludeDirs.includes(entry.name)) {
         continue;
       }
-
-      // 追加文档
-      fs.appendFileSync(filePath, FNMAP_DOCS_EN);
-      console.log(`${COLORS.green}✓${COLORS.reset} Appended fnmap documentation to ${matchedFile}`);
+      count += clearGeneratedFiles(fullPath, projectDir);
+    } else if (entry.isFile()) {
+      // 匹配生成的文件: .fnmap, *.fnmap, *.mermaid
+      const name = entry.name;
+      if (name === '.fnmap' || name.endsWith('.fnmap') || name.endsWith('.mermaid')) {
+        try {
+          fs.unlinkSync(fullPath);
+          logger.success(`Deleted: ${path.relative(projectDir, fullPath)}`);
+          count++;
+        } catch (err) {
+          const error = err as Error;
+          logger.error(`Failed to delete ${path.relative(projectDir, fullPath)}: ${error.message}`);
+        }
+      }
     }
+  }
+
+  return count;
+}
+
+/**
+ * 执行 clear 命令
+ */
+function executeClear(projectDir: string, targetDir?: string): void {
+  logger.title('fnmap - Clear Generated Files');
+  logger.info('='.repeat(50));
+
+  const dir = targetDir ? path.resolve(projectDir, targetDir) : projectDir;
+  const count = clearGeneratedFiles(dir, projectDir);
+
+  logger.info('='.repeat(50));
+  if (count > 0) {
+    logger.success(`Cleared ${count} generated file(s)`);
+  } else {
+    logger.info('No generated files found');
+  }
+}
+
+/**
+ * 添加 gitignore 规则
+ */
+function addGitignoreRules(projectDir: string): void {
+  const gitignorePath = path.join(projectDir, '.gitignore');
+
+  if (fs.existsSync(gitignorePath)) {
+    const content = fs.readFileSync(gitignorePath, 'utf-8');
+    // 检查是否已包含规则
+    if (content.includes('fnmap generated files') || content.includes('*.fnmap')) {
+      console.log(`${COLORS.yellow}!${COLORS.reset} .gitignore already contains fnmap rules`);
+      return;
+    }
+    // 追加规则
+    fs.appendFileSync(gitignorePath, GITIGNORE_RULES);
+  } else {
+    // 创建新的 .gitignore
+    fs.writeFileSync(gitignorePath, GITIGNORE_RULES.trim() + '\n');
+  }
+  console.log(`${COLORS.green}✓${COLORS.reset} Added fnmap rules to .gitignore`);
+}
+
+/**
+ * 写入文档到指定文件
+ */
+function writeDocsToFile(filePath: string, displayName: string): void {
+  // 确保目录存在
+  const dir = path.dirname(filePath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  if (fs.existsSync(filePath)) {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    if (content.includes('.fnmap Code Index Format')) {
+      console.log(`${COLORS.yellow}!${COLORS.reset} ${displayName} already contains fnmap documentation`);
+      return;
+    }
+    fs.appendFileSync(filePath, FNMAP_DOCS_EN);
+  } else {
+    fs.writeFileSync(filePath, FNMAP_DOCS_EN.trim() + '\n');
+  }
+  console.log(`${COLORS.green}✓${COLORS.reset} Added fnmap documentation to ${displayName}`);
+}
+
+/**
+ * 交互式初始化命令 - 支持多选
+ */
+async function executeInitInteractive(projectDir: string): Promise<void> {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+
+  console.log(`\n${COLORS.bold}fnmap - Interactive Setup${COLORS.reset}`);
+  console.log('='.repeat(50));
+
+  try {
+    // 1. 创建配置文件
+    const configPath = path.join(projectDir, '.fnmaprc');
+    if (fs.existsSync(configPath)) {
+      console.log(`${COLORS.yellow}!${COLORS.reset} Config file already exists: .fnmaprc`);
+    } else {
+      const defaultConfig = {
+        enable: true,
+        include: ['src/**/*.js', 'src/**/*.ts', 'src/**/*.jsx', 'src/**/*.tsx'],
+        exclude: ['node_modules', 'dist', 'build', '.next', 'coverage', '__pycache__', '.cache']
+      };
+      fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2));
+      console.log(`${COLORS.green}✓${COLORS.reset} Created config file: .fnmaprc`);
+    }
+
+    // 2. 询问是否添加 gitignore 规则
+    const gitignoreAnswer = await askQuestion(rl, `\nAdd fnmap rules to .gitignore? (Y/n): `);
+    if (gitignoreAnswer.toLowerCase() !== 'n') {
+      addGitignoreRules(projectDir);
+    }
+
+    // 3. 检测已存在的文件
+    const projectClaudeMdPath = path.join(projectDir, 'CLAUDE.md');
+    const projectAgentsMdPath = path.join(projectDir, 'AGENTS.md');
+    const userClaudeMdPath = path.join(os.homedir(), '.claude', 'CLAUDE.md');
+
+    const hasProjectClaudeMd = fs.existsSync(projectClaudeMdPath);
+    const hasProjectAgentsMd = fs.existsSync(projectAgentsMdPath);
+    const hasUserClaudeMd = fs.existsSync(userClaudeMdPath);
+
+    // 检查是否有任何项目级文件存在
+    const hasAnyProjectFile = hasProjectClaudeMd || hasProjectAgentsMd;
+
+    // 4. 如果没有任何项目级文件，询问是否创建
+    if (!hasAnyProjectFile) {
+      console.log(`\n${COLORS.yellow}!${COLORS.reset} No CLAUDE.md or AGENTS.md found in project.`);
+      const createAnswer = await askQuestion(rl, `Create CLAUDE.md with fnmap documentation? (Y/n): `);
+      if (createAnswer.toLowerCase() !== 'n') {
+        writeDocsToFile(projectClaudeMdPath, 'CLAUDE.md');
+      }
+    } else {
+      // 5. 显示多选菜单（只显示已存在的项目级文件）
+      console.log(`\n${COLORS.bold}Select files to add fnmap documentation:${COLORS.reset}`);
+      console.log(`(Enter numbers separated by comma, e.g., 1,2)\n`);
+
+      const options: { key: string; label: string; path: string; exists: boolean }[] = [];
+      let keyIndex = 1;
+
+      if (hasProjectClaudeMd) {
+        options.push({ key: String(keyIndex++), label: 'Project CLAUDE.md', path: projectClaudeMdPath, exists: true });
+      }
+      options.push({ key: String(keyIndex++), label: 'User CLAUDE.md (~/.claude/CLAUDE.md)', path: userClaudeMdPath, exists: hasUserClaudeMd });
+      if (hasProjectAgentsMd) {
+        options.push({ key: String(keyIndex++), label: 'AGENTS.md', path: projectAgentsMdPath, exists: true });
+      }
+
+      const customKey = String(keyIndex);
+
+      for (const opt of options) {
+        const existsMarker = opt.exists ? `${COLORS.green}[exists]${COLORS.reset}` : `${COLORS.gray}[new]${COLORS.reset}`;
+        console.log(`  ${opt.key}. ${opt.label} ${existsMarker}`);
+      }
+      console.log(`  ${customKey}. Custom file path`);
+      console.log(`  0. Skip\n`);
+
+      const selectionAnswer = await askQuestion(rl, `Your choice: `);
+      const selections = selectionAnswer.split(',').map((s) => s.trim()).filter(Boolean);
+
+      if (selections.includes('0') || selections.length === 0) {
+        console.log('Skipped adding documentation to files.');
+      } else {
+        // 处理选择
+        for (const sel of selections) {
+          if (sel === customKey) {
+            // 自定义文件路径
+            const customPath = await askQuestion(rl, `Enter custom file path: `);
+            if (customPath) {
+              const fullPath = path.isAbsolute(customPath) ? customPath : path.resolve(projectDir, customPath);
+              writeDocsToFile(fullPath, customPath);
+            }
+          } else {
+            const opt = options.find((o) => o.key === sel);
+            if (opt) {
+              writeDocsToFile(opt.path, opt.label);
+            }
+          }
+        }
+      }
+    }
+
+    console.log('\n' + '='.repeat(50));
+    console.log(`${COLORS.green}✓${COLORS.reset} Setup complete!`);
+    console.log(`\nRun ${COLORS.bold}fnmap${COLORS.reset} or ${COLORS.bold}fnmap --dir src${COLORS.reset} to generate code index.`);
+
+  } finally {
+    rl.close();
   }
 }
 
 /**
  * 主函数
  */
-export function main(): void {
+export async function main(): Promise<void> {
   // 配置并解析CLI
   const program = setupCLI();
   program.parse(process.argv);
@@ -82,29 +291,20 @@ export function main(): void {
 
   const projectDir = path.resolve(options.project);
 
-  // init命令：创建配置文件并更新 agent 文档
-  if (options.init) {
-    // 1. 检查并创建 .fnmaprc
-    const configPath = path.join(projectDir, '.fnmaprc');
-    if (fs.existsSync(configPath)) {
-      console.log(`${COLORS.yellow}!${COLORS.reset} Config file already exists: .fnmaprc`);
-    } else {
-      const defaultConfig = {
-        enable: true,
-        include: ['src/**/*.js', 'src/**/*.ts', 'src/**/*.jsx', 'src/**/*.tsx'],
-        exclude: ['node_modules', 'dist', 'build', '.next', 'coverage', '__pycache__', '.cache']
-      };
-      fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2));
-      console.log(`${COLORS.green}✓${COLORS.reset} Created config file: .fnmaprc`);
-    }
-
-    // 2. 检查并更新 CLAUDE.md 或 AGENTS.md（独立检测）
-    appendFnmapDocsToAgentFiles(projectDir);
+  // clear命令：清理生成的文件
+  if (options.clear) {
+    executeClear(projectDir, options.dir);
     return;
   }
 
-  // 合并文件参数
-  const fileArgs = [...(options.files ?? []), ...args].filter((f) => fs.existsSync(f));
+  // init命令：交互式初始化
+  if (options.init) {
+    await executeInitInteractive(projectDir);
+    return;
+  }
+
+  // 合并文件参数（位置参数也需要规范化路径）
+  const fileArgs = [...(options.files ?? []), ...args.map(normalizePath)].filter((f) => fs.existsSync(f));
 
   // 确定要处理的文件列表
   let filesToProcess: string[] = [];
@@ -140,7 +340,7 @@ export function main(): void {
     const relFiles = scanDirectory(targetDir, projectDir);
     filesToProcess = relFiles.map((f) => path.join(projectDir, f));
   } else {
-    // 检查项目配置文件
+    // 无参数时：读取配置中的 include 目录，像 -d 一样处理
     const { config, source } = loadConfig(projectDir);
 
     if (config) {
@@ -156,10 +356,20 @@ export function main(): void {
       const mergedConfig = mergeConfig(config);
       const excludes = [...DEFAULT_EXCLUDES, ...mergedConfig.exclude];
 
-      if (mergedConfig.include) {
+      if (mergedConfig.include && mergedConfig.include.length > 0) {
+        // 从 include 模式中提取目录并去重
+        const includeDirs = new Set<string>();
         for (const pattern of mergedConfig.include) {
-          const dir = pattern.replace(/\/\*\*\/.*$/, '').replace(/\*\*\/.*$/, '');
-          const targetDir = dir ? path.resolve(projectDir, dir) : projectDir;
+          // 从 glob 模式中提取目录部分，例如 src/**/*.ts -> src
+          const dir = pattern.replace(/\/\*\*\/.*$/, '').replace(/\*\*\/.*$/, '').replace(/\/\*\..*$/, '').replace(/\*\..*$/, '');
+          if (dir) {
+            includeDirs.add(dir);
+          }
+        }
+
+        // 对每个目录使用 -d 的方式处理
+        for (const dir of includeDirs) {
+          const targetDir = path.resolve(projectDir, dir);
           if (fs.existsSync(targetDir)) {
             const relFiles = scanDirectory(targetDir, projectDir, excludes);
             filesToProcess.push(...relFiles.map((f) => path.join(projectDir, f)));

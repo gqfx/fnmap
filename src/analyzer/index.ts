@@ -319,19 +319,45 @@ export function analyzeFile(code: unknown, filePath: string | null): AnalyzeResu
       if (parentType !== 'Program' && parentType !== 'ExportNamedDeclaration') return;
 
       const node = nodePath.node;
-      if (node.kind === 'const') {
-        const desc = extractJSDocDescription(getLeadingComment(node, nodePath.parent));
+      const desc = extractJSDocDescription(getLeadingComment(node, nodePath.parent));
 
-        for (const decl of node.declarations) {
-          const name = decl.id?.type === 'Identifier' ? decl.id.name : undefined;
-          if (name && name === name.toUpperCase() && name.length > 2) {
-            const startLine = node.loc?.start?.line ?? 0;
-            info.constants.push({
-              name,
-              line: startLine,
-              description: desc
-            } as ConstantInfo);
-          }
+      for (const decl of node.declarations) {
+        const name = decl.id?.type === 'Identifier' ? decl.id.name : undefined;
+        if (!name) continue;
+
+        // 检测箭头函数或函数表达式赋值: const foo = () => {} 或 const foo = function() {}
+        if (
+          decl.init?.type === 'ArrowFunctionExpression' ||
+          decl.init?.type === 'FunctionExpression'
+        ) {
+          const funcExpr = decl.init as t.ArrowFunctionExpression | t.FunctionExpression;
+          const params = funcExpr.params.map((p) => {
+            if (p.type === 'Identifier') return p.name;
+            if (p.type === 'AssignmentPattern' && p.left?.type === 'Identifier') return p.left.name + '?';
+            if (p.type === 'RestElement' && p.argument?.type === 'Identifier') return '...' + p.argument.name;
+            return '?';
+          });
+          const startLine = node.loc?.start?.line ?? 0;
+          const endLine = node.loc?.end?.line ?? 0;
+
+          info.functions.push({
+            name,
+            params: params.join(','),
+            startLine,
+            endLine,
+            description: desc
+          } as FunctionInfo);
+          continue;
+        }
+
+        // 全大写常量: const MAX_SIZE = 100
+        if (node.kind === 'const' && name === name.toUpperCase() && name.length > 2) {
+          const startLine = node.loc?.start?.line ?? 0;
+          info.constants.push({
+            name,
+            line: startLine,
+            description: desc
+          } as ConstantInfo);
         }
       }
     }

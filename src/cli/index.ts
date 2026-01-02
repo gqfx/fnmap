@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 import { COLORS } from '../constants';
+import { normalizePath } from '../validation';
 
 // 日志工具
 let quietMode = false;
@@ -60,16 +61,17 @@ export function setupCLI(): Command {
     .option('-f, --files <files>', 'Process specified files (comma-separated)', (val: string) =>
       val
         .split(',')
-        .map((f) => f.trim())
+        .map((f) => normalizePath(f.trim()))
         .filter(Boolean)
     )
-    .option('-d, --dir <dir>', 'Process all code files in directory')
-    .option('-p, --project <dir>', 'Specify project root directory', process.env.CLAUDE_PROJECT_DIR ?? process.cwd())
+    .option('-d, --dir <dir>', 'Process all code files in directory', (val: string) => normalizePath(val))
+    .option('-p, --project <dir>', 'Specify project root directory', (val: string) => normalizePath(val), process.env.CLAUDE_PROJECT_DIR ?? process.cwd())
     .option('-c, --changed', 'Process only git changed files (staged + modified + untracked)')
     .option('-s, --staged', 'Process only git staged files (for pre-commit hook)')
     .option('-m, --mermaid [mode]', 'Generate Mermaid call graph (file=file-level, project=project-level)')
     .option('-q, --quiet', 'Quiet mode')
-    .option('--init', 'Create default config file .fnmaprc')
+    .option('--init', 'Create default config file and setup project (interactive)')
+    .option('--clear', 'Clear generated files (.fnmap, *.fnmap, *.mermaid)')
     .argument('[files...]', 'Directly specify file paths')
     .allowUnknownOption(false)
     .addHelpText(
@@ -92,7 +94,9 @@ Examples:
   $ fnmap --staged -q                For pre-commit hook usage
   $ fnmap --mermaid file --dir src   Generate file-level call graphs
   $ fnmap --mermaid project          Generate project-level call graph
-  $ fnmap --init                     Create config file
+  $ fnmap --init                     Interactive project setup
+  $ fnmap --clear                    Clear all generated files
+  $ fnmap --clear --dir src          Clear generated files in src directory
 `
     );
 

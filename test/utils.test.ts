@@ -1,6 +1,48 @@
 import { describe, it, expect } from 'vitest';
 import { analyzeFile } from '../src/index';
 import type { FileInfo } from '../src/index';
+import { normalizePath, normalizePaths } from '../src/validation';
+
+// 测试路径规范化函数
+describe('Path Normalization', () => {
+  it('should normalize Windows-style paths', () => {
+    const input = 'src\\components\\Button.tsx';
+    const result = normalizePath(input);
+    expect(result).not.toContain('\\\\'); // 不应有双反斜杠
+    expect(result).toMatch(/src.components.Button\.tsx$/);
+  });
+
+  it('should normalize Unix-style paths', () => {
+    const input = 'src/components/Button.tsx';
+    const result = normalizePath(input);
+    expect(result).toMatch(/src.components.Button\.tsx$/);
+  });
+
+  it('should handle mixed separators', () => {
+    const input = 'src\\components/utils\\index.ts';
+    const result = normalizePath(input);
+    expect(result).toMatch(/src.components.utils.index\.ts$/);
+  });
+
+  it('should handle empty path', () => {
+    expect(normalizePath('')).toBe('');
+  });
+
+  it('should normalize array of paths', () => {
+    const inputs = ['src\\a.ts', 'lib/b.ts', 'test\\c/d.ts'];
+    const results = normalizePaths(inputs);
+    expect(results).toHaveLength(3);
+    results.forEach(p => {
+      expect(p).not.toContain('\\\\');
+    });
+  });
+
+  it('should handle absolute Windows paths', () => {
+    const input = 'D:\\coding\\project\\src\\index.ts';
+    const result = normalizePath(input);
+    expect(result).toMatch(/index\.ts$/);
+  });
+});
 
 // 测试工具函数
 describe('Utility Functions', () => {

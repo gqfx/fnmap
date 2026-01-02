@@ -126,6 +126,14 @@ export interface CLIOptions {
   mermaid?: boolean | 'file' | 'project';
   quiet?: boolean;
   init?: boolean;
+  clear?: boolean;
+}
+
+// init 命令的交互式选项
+export interface InitOptions {
+  gitignore: boolean; // 是否添加 .gitignore 规则
+  claudeMd: 'project' | 'user' | 'none'; // 写入项目还是用户的 CLAUDE.md
+  cursorRules: boolean; // 是否写入 .cursorrules
 }
 
 // ============== 错误格式化上下文 ==============

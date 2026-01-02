@@ -126,6 +126,54 @@ const arrowBlock = (a, b) => {
 
     expect(result).toBeDefined();
     expect(isParseError(result)).toBe(false);
+    const info = result as FileInfo;
+    expect(info.functions).toHaveLength(2);
+    expect(info.functions[0]!.name).toBe('arrow');
+    expect(info.functions[0]!.params).toBe('x,y');
+    expect(info.functions[1]!.name).toBe('arrowBlock');
+    expect(info.functions[1]!.params).toBe('a,b');
+  });
+
+  it('should handle async arrow functions', () => {
+    const code = `
+/** 写入日志到浏览器 */
+const writeLodBrowser = async () => {};
+
+const fetchData = async (url, options) => {
+  const response = await fetch(url, options);
+  return response.json();
+};
+    `;
+    const result = analyzeFile(code, 'async-arrow.js');
+
+    expect(result).toBeDefined();
+    expect(isParseError(result)).toBe(false);
+    const info = result as FileInfo;
+    expect(info.functions).toHaveLength(2);
+    expect(info.functions[0]!.name).toBe('writeLodBrowser');
+    expect(info.functions[0]!.params).toBe('');
+    expect(info.functions[0]!.description).toContain('写入日志到浏览器');
+    expect(info.functions[1]!.name).toBe('fetchData');
+    expect(info.functions[1]!.params).toBe('url,options');
+  });
+
+  it('should handle function expressions', () => {
+    const code = `
+const myFunc = function(a, b) {
+  return a + b;
+};
+const namedFunc = function calculate(x, y) {
+  return x * y;
+};
+    `;
+    const result = analyzeFile(code, 'func-expr.js');
+
+    expect(result).toBeDefined();
+    expect(isParseError(result)).toBe(false);
+    const info = result as FileInfo;
+    expect(info.functions).toHaveLength(2);
+    expect(info.functions[0]!.name).toBe('myFunc');
+    expect(info.functions[1]!.name).toBe('namedFunc');
   });
 
   it('should handle default parameters', () => {

@@ -1,7 +1,25 @@
 import fs from 'fs';
+import path from 'path';
 import type { ValidationResult, ErrorContext, FnmapConfig, ErrorType } from '../types';
 import { ErrorTypes } from '../types';
 import { MAX_FILE_SIZE } from '../constants';
+
+/**
+ * 规范化路径，统一使用系统原生分隔符
+ */
+export function normalizePath(inputPath: string): string {
+  if (!inputPath) return inputPath;
+  // 先将所有反斜杠转为正斜杠，再用 path.normalize 统一处理
+  const unified = inputPath.replace(/\\/g, '/');
+  return path.normalize(unified);
+}
+
+/**
+ * 规范化多个路径
+ */
+export function normalizePaths(paths: string[]): string[] {
+  return paths.map(normalizePath);
+}
 
 /**
  * 验证文件路径
