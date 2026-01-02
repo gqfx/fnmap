@@ -4,6 +4,48 @@ import { ErrorTypes, isParseError } from '../types';
 import { validateFilePath, formatError } from '../validation';
 import { analyzeFile } from '../analyzer';
 
+export interface ProcessCodeOptions {
+  /** 文件路径（用于判断是否为 TS 文件，可选） */
+  filePath?: string;
+}
+
+/**
+ * 处理代码字符串，返回分析结果
+ */
+export function processCode(code: string, options?: ProcessCodeOptions): ProcessResult {
+  const filePath = options?.filePath ?? null;
+
+  try {
+    const result = analyzeFile(code, filePath);
+
+    if (!result) {
+      return {
+        success: false,
+        error: 'Analysis returned null / 分析返回空值',
+        errorType: ErrorTypes.PARSE_ERROR
+      };
+    }
+
+    if (isParseError(result)) {
+      return {
+        success: false,
+        error: result.parseError,
+        errorType: result.errorType,
+        loc: result.loc
+      };
+    }
+
+    return { success: true, info: result };
+  } catch (e) {
+    const error = e as Error;
+    return {
+      success: false,
+      error: `Failed to process code / 处理代码失败: ${error.message}`,
+      errorType: ErrorTypes.PARSE_ERROR
+    };
+  }
+}
+
 /**
  * 处理单个文件(只分析,不修改文件)
  */

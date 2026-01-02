@@ -54,7 +54,8 @@ export { analyzeFile, extractJSDocDescription } from './analyzer';
 export { generateHeader, removeExistingHeaders, generateAiMap, generateFileMermaid, generateProjectMermaid } from './generator';
 
 // 导出处理器
-export { processFile } from './processor';
+export { processFile, processCode } from './processor';
+export type { ProcessCodeOptions } from './processor';
 
 // 导出主函数
 import { main } from './main';
