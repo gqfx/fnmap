@@ -142,7 +142,8 @@ fnmap 支持多种配置方式（按优先级排序）：
 - `ClassName:SuperClass startLine-endLine` - 类信息
 - `  .methodName(params) line description →calls` - 实例方法
 - `  +methodName(params) line description →calls` - 静态方法
-- `CONSTANT_NAME line description` - 常量定义
+- `$constName line description` - 常量定义（`$` 前缀）
+- `>export1,export2,default` - 导出（`>` 前缀，支持 `default`、`type:Name`）
 
 ## CLI 选项
 

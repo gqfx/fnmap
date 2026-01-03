@@ -26,7 +26,8 @@ The \`.fnmap\` file provides a structured code index for quick navigation. Read 
 - \`ClassName:SuperClass 30-100\` - Class definition with inheritance
 - \`  .method(params) 35 →callee\` - Instance method (\`.\` prefix)
 - \`  +staticMethod(params) 40\` - Static method (\`+\` prefix)
-- \`CONST_NAME 5\` - Constant definition with line number
+- \`$constName 5\` - Constant definition (\`$\` prefix)
+- \`>export1,export2,default\` - Exports (\`>\` prefix, supports \`default\`, \`type:Name\`)
 
 **Call Graph:** The \`→\` at the end of function/method lines indicates which functions are called (both local and imported), helping you understand code execution flow.
 

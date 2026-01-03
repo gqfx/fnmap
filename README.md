@@ -142,7 +142,8 @@ The `.fnmap` file contains structured information about your code:
 - `ClassName:SuperClass startLine-endLine` - Class information
 - `  .methodName(params) line description →calls` - Instance method
 - `  +methodName(params) line description →calls` - Static method
-- `CONSTANT_NAME line description` - Constant definition
+- `$constName line description` - Constant definition (`$` prefix)
+- `>export1,export2,default` - Exports (`>` prefix, supports `default`, `type:Name`)
 
 ## CLI Options
 

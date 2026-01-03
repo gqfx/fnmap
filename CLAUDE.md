@@ -64,7 +64,8 @@ The `.fnmap` files use a compact format for AI consumption:
   ClassName:SuperClass 30-100  # class with inheritance
     .method(params) 35 →callee # instance method
     +staticMethod(params) 40   # static method
-  CONST_NAME 5                 # constant
+  $constName 5                 # constant ($ prefix)
+  >export1,export2,default     # exports (> prefix)
 ```
 
 ## Testing
