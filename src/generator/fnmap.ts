@@ -53,9 +53,9 @@ export function generateAiMap(dirPath: string, filesInfo: FileInfoEntry[]): stri
       lines.push(fnLine);
     }
 
-    // 添加常量信息
+    // 添加常量信息（$ 前缀标识常量）
     for (const c of info.constants) {
-      let constLine = `  ${c.name} ${c.line}`;
+      let constLine = `  $${c.name} ${c.line}`;
       if (c.description) constLine += ` ${c.description}`;
       lines.push(constLine);
     }

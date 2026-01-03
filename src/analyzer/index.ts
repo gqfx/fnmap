@@ -486,14 +486,20 @@ export function analyzeFile(code: unknown, filePath: string | null): AnalyzeResu
           }
         }
 
-        // 全大写常量: const MAX_SIZE = 100
-        if (node.kind === 'const' && name === name.toUpperCase() && name.length > 2) {
-          const startLine = node.loc?.start?.line ?? 0;
-          info.constants.push({
-            name,
-            line: startLine,
-            description: desc
-          } as ConstantInfo);
+        // const 常量（非函数、非类、非对象字面量、非 require 调用）
+        if (node.kind === 'const') {
+          // 排除 require() 调用
+          const isRequireCall = decl.init?.type === 'CallExpression' &&
+            decl.init.callee?.type === 'Identifier' &&
+            decl.init.callee.name === 'require';
+          if (!isRequireCall) {
+            const startLine = node.loc?.start?.line ?? 0;
+            info.constants.push({
+              name,
+              line: startLine,
+              description: desc
+            } as ConstantInfo);
+          }
         }
       }
     },
