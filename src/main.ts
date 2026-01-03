@@ -422,6 +422,16 @@ export async function main(): Promise<void> {
         continue;
       }
 
+      // 跳过空内容文件（没有任何函数、类、常量、导出）
+      const hasContent = info.functions.length > 0 ||
+        info.classes.length > 0 ||
+        info.constants.length > 0 ||
+        (info.exports && info.exports.length > 0);
+      if (!hasContent) {
+        logger.info(`Skipped (empty file) / 跳过空文件`);
+        continue;
+      }
+
       logger.success(
         `Imports: ${info.imports.length}, Functions: ${info.functions.length}, Classes: ${info.classes.length}, Constants: ${info.constants.length}`
       );

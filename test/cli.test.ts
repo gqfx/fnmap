@@ -99,7 +99,7 @@ describe('CLI', () => {
   it('should handle --dir arguments', async () => {
     const subDir = path.join(tempDir, 'src');
     fs.mkdirSync(subDir, { recursive: true });
-    fs.writeFileSync(path.join(subDir, 'a.js'), 'const a = 1;');
+    fs.writeFileSync(path.join(subDir, 'a.js'), 'function test() {}');
 
     process.argv = ['node', 'fnmap', '--dir', 'src', '--project', tempDir];
 

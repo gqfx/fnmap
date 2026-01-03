@@ -79,6 +79,13 @@ export interface ConstantInfo {
   description: string;
 }
 
+export interface ExportInfo {
+  name: string; // 导出名（default 表示默认导出）
+  localName?: string; // 本地名称（如果与导出名不同）
+  line: number;
+  kind: 'value' | 'type' | 'default'; // 导出类型
+}
+
 export type CallGraph = Record<string, string[]>;
 
 export interface FileInfo {
@@ -87,6 +94,7 @@ export interface FileInfo {
   functions: FunctionInfo[];
   classes: ClassInfo[];
   constants: ConstantInfo[];
+  exports: ExportInfo[];
   callGraph: CallGraph;
   isPureType?: boolean; // 是否为纯类型文件（只有 type/interface 声明）
 }

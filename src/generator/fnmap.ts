@@ -59,6 +59,21 @@ export function generateAiMap(dirPath: string, filesInfo: FileInfoEntry[]): stri
       if (c.description) constLine += ` ${c.description}`;
       lines.push(constLine);
     }
+
+    // 添加导出信息
+    if (info.exports && info.exports.length > 0) {
+      const exportNames: string[] = [];
+      for (const exp of info.exports) {
+        if (exp.kind === 'default') {
+          exportNames.push(exp.localName ? `default:${exp.localName}` : 'default');
+        } else if (exp.kind === 'type') {
+          exportNames.push(`type:${exp.name}`);
+        } else {
+          exportNames.push(exp.name);
+        }
+      }
+      lines.push(`  >${exportNames.join(',')}`);
+    }
   }
 
   lines.push('@FNMAP');

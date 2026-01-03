@@ -9,7 +9,8 @@ import type {
   FunctionInfo,
   ClassInfo,
   MethodInfo,
-  ConstantInfo
+  ConstantInfo,
+  ExportInfo
 } from '../types';
 import { ErrorTypes } from '../types';
 import { formatError } from '../validation';
@@ -45,6 +46,7 @@ export function analyzeFile(code: unknown, filePath: string | null): AnalyzeResu
       functions: [],
       classes: [],
       constants: [],
+      exports: [],
       callGraph: {}
     };
   }
@@ -55,6 +57,7 @@ export function analyzeFile(code: unknown, filePath: string | null): AnalyzeResu
     functions: [],
     classes: [],
     constants: [],
+    exports: [],
     callGraph: {}
   };
 
@@ -860,6 +863,100 @@ export function analyzeFile(code: unknown, filePath: string | null): AnalyzeResu
   for (const [caller, callees] of callGraph) {
     info.callGraph[caller] = Array.from(callees);
   }
+
+  // 第四遍：收集导出信息
+  traverse(ast, {
+    ExportNamedDeclaration(nodePath: NodePath<t.ExportNamedDeclaration>) {
+      const node = nodePath.node;
+      const line = node.loc?.start?.line ?? 0;
+      const isTypeExport = node.exportKind === 'type';
+
+      // export { a, b } 或 export { a as b }
+      if (node.specifiers && node.specifiers.length > 0) {
+        for (const spec of node.specifiers) {
+          if (spec.type === 'ExportSpecifier') {
+            const exportedName = spec.exported.type === 'Identifier' ? spec.exported.name : spec.exported.value;
+            const localName = spec.local.name;
+            const specIsType = isTypeExport || spec.exportKind === 'type';
+            info.exports.push({
+              name: exportedName,
+              localName: localName !== exportedName ? localName : undefined,
+              line,
+              kind: specIsType ? 'type' : 'value'
+            } as ExportInfo);
+          }
+        }
+        return;
+      }
+
+      // export function foo() {} 或 export const bar = ...
+      if (node.declaration) {
+        const decl = node.declaration;
+
+        // export function foo() {}
+        if (decl.type === 'FunctionDeclaration' && decl.id) {
+          info.exports.push({
+            name: decl.id.name,
+            line,
+            kind: 'value'
+          } as ExportInfo);
+        }
+        // export class Foo {}
+        else if (decl.type === 'ClassDeclaration' && decl.id) {
+          info.exports.push({
+            name: decl.id.name,
+            line,
+            kind: 'value'
+          } as ExportInfo);
+        }
+        // export const/let/var a = ..., b = ...
+        else if (decl.type === 'VariableDeclaration') {
+          for (const varDecl of decl.declarations) {
+            if (varDecl.id.type === 'Identifier') {
+              info.exports.push({
+                name: varDecl.id.name,
+                line,
+                kind: 'value'
+              } as ExportInfo);
+            }
+          }
+        }
+        // export type Foo = ... 或 export interface Foo {}
+        else if (decl.type === 'TSTypeAliasDeclaration' || decl.type === 'TSInterfaceDeclaration') {
+          if (decl.id) {
+            info.exports.push({
+              name: decl.id.name,
+              line,
+              kind: 'type'
+            } as ExportInfo);
+          }
+        }
+      }
+    },
+
+    ExportDefaultDeclaration(nodePath: NodePath<t.ExportDefaultDeclaration>) {
+      const node = nodePath.node;
+      const line = node.loc?.start?.line ?? 0;
+      const decl = node.declaration;
+
+      // 获取默认导出的名称（如果有）
+      let localName: string | undefined;
+      if (decl.type === 'FunctionDeclaration' && decl.id) {
+        localName = decl.id.name;
+      } else if (decl.type === 'ClassDeclaration' && decl.id) {
+        localName = decl.id.name;
+      } else if (decl.type === 'Identifier') {
+        localName = decl.name;
+      }
+
+      info.exports.push({
+        name: 'default',
+        localName,
+        line,
+        kind: 'default'
+      } as ExportInfo);
+    }
+  });
 
   // 检测是否为纯类型文件（只有 type/interface 声明，没有实际运行时代码）
   info.isPureType = isPureTypeFile(ast);
