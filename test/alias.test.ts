@@ -78,11 +78,11 @@ describe('transformImports', () => {
     expect(result.code).toContain('@/utils/helper');
   });
 
-  it('应转换动态 import()', () => {
+  it('不应转换动态 import()（构建工具不处理）', () => {
     const code = `const mod = import('../utils/helper');`;
     const result = transformImports(code, 'src/pages/index.ts', aliases);
-    expect(result.changes).toHaveLength(1);
-    expect(result.code).toContain('@/utils/helper');
+    expect(result.changes).toHaveLength(0);
+    expect(result.code).toBeNull();
   });
 
   it('应处理多个导入', () => {

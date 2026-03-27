@@ -7,7 +7,7 @@ import path from 'path';
 import parser from '@babel/parser';
 import _traverse from '@babel/traverse';
 import _generate from '@babel/generator';
-import * as t from '@babel/types';
+import type * as t from '@babel/types';
 import { logger } from '../cli';
 import { COLORS } from '../constants';
 import { normalizePath } from '../validation';
@@ -169,16 +169,6 @@ export function transformImports(
     },
     ExportAllDeclaration(nodePath) {
       processSource(nodePath.node.source, fileDir, aliases, changes);
-    },
-    // 处理动态 import()
-    CallExpression(nodePath) {
-      if (
-        nodePath.node.callee.type === 'Import' &&
-        nodePath.node.arguments.length > 0 &&
-        t.isStringLiteral(nodePath.node.arguments[0])
-      ) {
-        processSource(nodePath.node.arguments[0], fileDir, aliases, changes);
-      }
     },
   });
 
