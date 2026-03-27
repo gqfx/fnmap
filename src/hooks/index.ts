@@ -155,6 +155,74 @@ fi
 `;
 }
 
+// fnmap hooks 的固定标识，用于幂等更新
+const FNMAP_PRE_HOOK_MARKER = '检查 .fnmap 文件保护...';
+const FNMAP_STOP_HOOK_MARKER = 'quality-check.sh';
+
+// PreToolUse 的内联 node 命令 - 禁止 AI 修改 .fnmap 文件
+const FNMAP_PROTECT_COMMAND = `node -e "const j=JSON.parse(require('fs').readFileSync(0,'utf8'));const f=j.tool_input?.file_path||'';if(f.endsWith('.fnmap')){console.log(JSON.stringify({hookSpecificOutput:{hookEventName:'PreToolUse',permissionDecision:'deny',permissionDecisionReason:'.fnmap 文件由脚本自动维护，禁止手动修改。请使用 fnmap --changed 命令更新。'}}));}"`;
+
+/** 将 fnmap hooks 安装到项目的 .claude 目录 */
+export function installHooks(projectDir: string, detectedTools: DetectedTool[]): void {
+  const claudeDir = path.join(projectDir, '.claude');
+  const hooksDir = path.join(claudeDir, 'hooks');
+  const settingsPath = path.join(claudeDir, 'settings.json');
+  const scriptPath = path.join(hooksDir, 'quality-check.sh');
+
+  // 确保目录存在
+  fs.mkdirSync(hooksDir, { recursive: true });
+
+  // 1. 生成并写入质量检查脚本
+  const script = generateQualityScript(detectedTools);
+  fs.writeFileSync(scriptPath, script);
+
+  // 2. 读取已有 settings.json 或创建空对象
+  let settings: Record<string, any> = {};
+  if (fs.existsSync(settingsPath)) {
+    try {
+      settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+    } catch {
+      settings = {};
+    }
+  }
+
+  // 确保 hooks 对象存在
+  if (!settings.hooks) settings.hooks = {};
+
+  // 3. 安装/更新 PreToolUse hook（fnmap 文件保护）
+  if (!settings.hooks.PreToolUse) settings.hooks.PreToolUse = [];
+  // 幂等：移除已有的 fnmap hook
+  settings.hooks.PreToolUse = settings.hooks.PreToolUse.filter(
+    (h: any) => !h.hooks?.some((hh: any) => hh.statusMessage?.includes('fnmap'))
+  );
+  settings.hooks.PreToolUse.push({
+    matcher: 'Edit|Write',
+    hooks: [{
+      type: 'command',
+      command: FNMAP_PROTECT_COMMAND,
+      statusMessage: FNMAP_PRE_HOOK_MARKER
+    }]
+  });
+
+  // 4. 安装/更新 Stop hook（质量检查）
+  if (!settings.hooks.Stop) settings.hooks.Stop = [];
+  settings.hooks.Stop = settings.hooks.Stop.filter(
+    (h: any) => !h.hooks?.some((hh: any) => hh.command?.includes(FNMAP_STOP_HOOK_MARKER))
+  );
+  settings.hooks.Stop.push({
+    matcher: '',
+    hooks: [{
+      type: 'command',
+      command: 'bash .claude/hooks/quality-check.sh',
+      timeout: 120,
+      statusMessage: '代码质量检查中...'
+    }]
+  });
+
+  // 5. 写入 settings.json
+  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+}
+
 /** 检测项目中安装的工具 */
 export function detectTools(projectDir: string): DetectedTool[] {
   const deps = readDeps(projectDir);

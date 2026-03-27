@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
-import { detectTools, generateQualityScript } from '../src/hooks';
+import { detectTools, generateQualityScript, installHooks } from '../src/hooks';
 import type { DetectedTool } from '../src/types';
 
 describe('detectTools', () => {
@@ -188,6 +188,83 @@ describe('generateQualityScript', () => {
     const script = generateQualityScript(tools);
     expect(script).toContain('tsc --noEmit');
     expect(script).toContain('prettier --check');
+    expect(script).toContain('vitest run');
+  });
+});
+
+describe('installHooks', () => {
+  const tempDir = path.join(__dirname, 'fixtures', 'temp-hooks-install');
+
+  beforeEach(() => {
+    fs.mkdirSync(tempDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('应创建 .claude/settings.json 和 hooks 脚本', () => {
+    const tools: DetectedTool[] = [
+      { name: 'typescript', detected: true, source: 'devDependencies', level: 'block' }
+    ];
+    installHooks(tempDir, tools);
+    expect(fs.existsSync(path.join(tempDir, '.claude', 'settings.json'))).toBe(true);
+    expect(fs.existsSync(path.join(tempDir, '.claude', 'hooks', 'quality-check.sh'))).toBe(true);
+  });
+
+  it('settings.json 应包含 PreToolUse 和 Stop hooks', () => {
+    const tools: DetectedTool[] = [
+      { name: 'typescript', detected: true, source: 'devDependencies', level: 'block' }
+    ];
+    installHooks(tempDir, tools);
+    const settings = JSON.parse(fs.readFileSync(path.join(tempDir, '.claude', 'settings.json'), 'utf-8'));
+    expect(settings.hooks.PreToolUse).toBeDefined();
+    expect(settings.hooks.Stop).toBeDefined();
+    expect(settings.hooks.PreToolUse[0].matcher).toBe('Edit|Write');
+    expect(settings.hooks.Stop[0].hooks[0].command).toContain('quality-check.sh');
+  });
+
+  it('应合并已有的 settings.json 而非覆盖', () => {
+    fs.mkdirSync(path.join(tempDir, '.claude'), { recursive: true });
+    fs.writeFileSync(path.join(tempDir, '.claude', 'settings.json'), JSON.stringify({
+      permissions: { allow: ['Bash(git:*)'] },
+      hooks: {
+        SessionStart: [{ matcher: '', hooks: [{ type: 'command', command: 'echo hi' }] }]
+      }
+    }, null, 2));
+
+    installHooks(tempDir, []);
+
+    const settings = JSON.parse(fs.readFileSync(path.join(tempDir, '.claude', 'settings.json'), 'utf-8'));
+    expect(settings.permissions.allow).toContain('Bash(git:*)');
+    expect(settings.hooks.SessionStart).toBeDefined();
+    expect(settings.hooks.PreToolUse).toBeDefined();
+    expect(settings.hooks.Stop).toBeDefined();
+  });
+
+  it('幂等：重复安装应更新而非重复添加', () => {
+    installHooks(tempDir, []);
+    installHooks(tempDir, []);
+
+    const settings = JSON.parse(fs.readFileSync(path.join(tempDir, '.claude', 'settings.json'), 'utf-8'));
+    const fnmapPreHooks = settings.hooks.PreToolUse.filter(
+      (h: any) => h.hooks?.some((hh: any) => hh.statusMessage?.includes('fnmap'))
+    );
+    expect(fnmapPreHooks.length).toBe(1);
+
+    const fnmapStopHooks = settings.hooks.Stop.filter(
+      (h: any) => h.hooks?.some((hh: any) => hh.command?.includes('quality-check.sh'))
+    );
+    expect(fnmapStopHooks.length).toBe(1);
+  });
+
+  it('quality-check.sh 应包含检测到的工具', () => {
+    const tools: DetectedTool[] = [
+      { name: 'vitest', detected: true, source: 'devDependencies', level: 'block' }
+    ];
+    installHooks(tempDir, tools);
+    const script = fs.readFileSync(path.join(tempDir, '.claude', 'hooks', 'quality-check.sh'), 'utf-8');
+    expect(script).toContain('#!/bin/bash');
     expect(script).toContain('vitest run');
   });
 });
