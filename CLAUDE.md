@@ -52,6 +52,7 @@ src/
 - `FileInfo`: Contains imports, functions, classes, constants, and call graph
 - `FnmapConfig`: Configuration with include/exclude patterns
 - `ProcessResult`: Union type for success/failure results with type guards
+- `DetectedTool`: Tool detection result for hooks setup (name, detected, source, level)
 
 ## .fnmap File Format
 
@@ -75,6 +76,15 @@ The `.fnmap` files use a compact format for AI consumption:
 ## Testing
 
 Tests are in `test/` directory with fixtures in `test/fixtures/`. Each module has corresponding test file (e.g., `analyzer.test.ts`, `processor.test.ts`).
+
+## CLI Options
+
+Key options beyond basic file processing:
+
+- `--init`: Interactive project setup (config file, .gitignore, CLAUDE.md, .cursorrules)
+- `--clear`: Remove all generated `.fnmap` and `.mermaid` files
+- `--hooks`: Setup Claude Code hooks for automatic quality checks on file save/commit
+- `--changed` / `--staged`: Process only git-changed or staged files (useful in hooks)
 
 ## Build Output
 
