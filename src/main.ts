@@ -10,6 +10,7 @@ import { scanDirectory, getGitChangedFiles, scanSingleDirectory } from './scanne
 import { processFile } from './processor';
 import { generateAiMap, generateFileMermaid, generateProjectMermaid } from './generator';
 import { normalizePath } from './validation';
+import { executeHooksSetup } from './hooks';
 
 /** fnmap 格式说明的英文版内容 */
 const FNMAP_DOCS_EN = `
@@ -265,6 +266,12 @@ async function executeInitInteractive(projectDir: string): Promise<void> {
       }
     }
 
+    // 5. 询问是否安装 Claude Code hooks
+    const hooksAnswer = await askQuestion(rl, `\nSetup Claude Code hooks for auto quality checks? (Y/n): `);
+    if (hooksAnswer.toLowerCase() !== 'n') {
+      await executeHooksSetup(projectDir, rl);
+    }
+
     console.log('\n' + '='.repeat(50));
     console.log(`${COLORS.green}✓${COLORS.reset} Setup complete!`);
     console.log(`\nRun ${COLORS.bold}fnmap${COLORS.reset} or ${COLORS.bold}fnmap --dir src${COLORS.reset} to generate code index.`);
@@ -297,6 +304,15 @@ export async function main(): Promise<void> {
     const originalQuietMode = isQuietMode();
     setQuietMode(false);
     executeClear(projectDir, options.dir);
+    setQuietMode(originalQuietMode);
+    return;
+  }
+
+  // hooks命令：安装 Claude Code hooks（临时关闭静默模式）
+  if (options.hooks) {
+    const originalQuietMode = isQuietMode();
+    setQuietMode(false);
+    await executeHooksSetup(projectDir);
     setQuietMode(originalQuietMode);
     return;
   }

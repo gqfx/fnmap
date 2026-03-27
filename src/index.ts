@@ -27,7 +27,8 @@ export type {
   CLIOptions,
   InitOptions,
   ErrorContext,
-  FileInfoEntry
+  FileInfoEntry,
+  DetectedTool
 } from './types';
 
 // 导出类型守卫
@@ -57,6 +58,9 @@ export { generateHeader, removeExistingHeaders, generateAiMap, generateFileMerma
 // 导出处理器
 export { processFile, processCode } from './processor';
 export type { ProcessCodeOptions } from './processor';
+
+// 导出 hooks
+export { detectTools, generateQualityScript, installHooks, executeHooksSetup } from './hooks';
 
 // 导出主函数
 import { main } from './main';

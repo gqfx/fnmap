@@ -1,6 +1,8 @@
 import fs from 'fs';
 import path from 'path';
+import * as readline from 'node:readline';
 import type { DetectedTool } from '../types';
+import { COLORS } from '../constants';
 
 /** 读取 package.json 的所有依赖名 */
 function readDeps(projectDir: string): Set<string> {
@@ -221,6 +223,66 @@ export function installHooks(projectDir: string, detectedTools: DetectedTool[]):
 
   // 5. 写入 settings.json
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+}
+
+/** 交互式提问工具 */
+function askQuestion(rl: readline.Interface, question: string): Promise<string> {
+  return new Promise((resolve) => {
+    rl.question(question, (answer) => {
+      resolve(answer.trim());
+    });
+  });
+}
+
+/** 交互式 hooks 安装流程 */
+export async function executeHooksSetup(projectDir: string, rl?: readline.Interface): Promise<void> {
+  const ownRl = !rl;
+  if (!rl) {
+    rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  }
+
+  try {
+    console.log(`\n${COLORS.bold}fnmap - Claude Code Hooks Setup${COLORS.reset}`);
+    console.log('='.repeat(50));
+    console.log('Detecting project tools...\n');
+
+    const tools = detectTools(projectDir);
+
+    for (const tool of tools) {
+      if (tool.detected) {
+        console.log(`  ${COLORS.green}✓${COLORS.reset} ${tool.name} (${tool.source})`);
+      } else {
+        console.log(`  ${COLORS.gray}✗ ${tool.name} (not found)${COLORS.reset}`);
+      }
+    }
+
+    const enabledTools = tools.filter(t => t.detected);
+
+    console.log(`\nHooks to install:`);
+    console.log(`  1. ${COLORS.bold}[protect]${COLORS.reset}  Block AI from editing .fnmap files (PreToolUse)`);
+    console.log(`  2. ${COLORS.bold}[fnmap]${COLORS.reset}    Auto-update fnmap index on stop (Stop)`);
+
+    let idx = 3;
+    for (const tool of enabledTools) {
+      const levelTag = tool.level === 'block' ? 'block on errors' : 'warn on issues';
+      console.log(`  ${idx}. ${COLORS.bold}[${tool.name}]${COLORS.reset}${' '.repeat(Math.max(1, 10 - tool.name.length))}${tool.name} check - ${levelTag} (Stop)`);
+      idx++;
+    }
+
+    const answer = await askQuestion(rl, `\nInstall these hooks to .claude/settings.json? (Y/n): `);
+    if (answer.toLowerCase() === 'n') {
+      console.log('Skipped hooks installation.');
+      return;
+    }
+
+    installHooks(projectDir, enabledTools);
+
+    console.log(`\n${COLORS.green}✓${COLORS.reset} Created .claude/hooks/quality-check.sh`);
+    console.log(`${COLORS.green}✓${COLORS.reset} Updated .claude/settings.json`);
+    console.log(`${COLORS.green}✓${COLORS.reset} Hooks installed! Restart Claude Code session to activate.`);
+  } finally {
+    if (ownRl && rl) rl.close();
+  }
 }
 
 /** 检测项目中安装的工具 */
