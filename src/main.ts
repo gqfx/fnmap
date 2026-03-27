@@ -12,8 +12,13 @@ import { generateAiMap, generateFileMermaid, generateProjectMermaid } from './ge
 import { normalizePath } from './validation';
 import { executeHooksSetup } from './hooks';
 
+/** fnmap 注入内容的起止标记 */
+const FNMAP_MARKER_START = '<!-- fnmap:start -->';
+const FNMAP_MARKER_END = '<!-- fnmap:end -->';
+
 /** fnmap 格式说明的英文版内容 */
 const FNMAP_DOCS_EN = `
+${FNMAP_MARKER_START}
 
 ## .fnmap Code Index Format
 
@@ -32,13 +37,17 @@ The \`.fnmap\` file provides a structured code index for quick navigation. Read 
 
 **Call Graph:** The \`→\` at the end of function/method lines indicates which functions are called (both local and imported), helping you understand code execution flow.
 
-**Note:** \`.fnmap\` files are auto-maintained by scripts and should not be manually updated.
+## .fnmap File Protection
+
+\`.fnmap\` files are **auto-generated** by the fnmap tool. **DO NOT** edit, create, rename, or delete any \`.fnmap\` or \`*.fnmap\` files directly. Only read them for code navigation. Updates are handled automatically by hooks running \`fnmap --changed\`.
 
 ## Code Comment Guidelines
 
 1. Every global variable, function, class, and file module must have a **concise comment describing its purpose or functionality** - avoid describing anything else
 2. When updating code, always update related comments to reflect the changes
 3. Prefer encapsulating logic in functions rather than writing flat, sequential code
+
+${FNMAP_MARKER_END}
 `;
 
 /** 生成文件的 gitignore 规则 */
@@ -142,7 +151,7 @@ function addGitignoreRules(projectDir: string): void {
 }
 
 /**
- * 写入文档到指定文件
+ * 写入文档到指定文件，支持通过标记覆写已有内容
  */
 function writeDocsToFile(filePath: string, displayName: string): void {
   // 确保目录存在
@@ -153,15 +162,26 @@ function writeDocsToFile(filePath: string, displayName: string): void {
 
   if (fs.existsSync(filePath)) {
     const content = fs.readFileSync(filePath, 'utf-8');
-    if (content.includes('.fnmap Code Index Format')) {
-      console.log(`${COLORS.yellow}!${COLORS.reset} ${displayName} already contains fnmap documentation`);
-      return;
+    const startIdx = content.indexOf(FNMAP_MARKER_START);
+    const endIdx = content.indexOf(FNMAP_MARKER_END);
+
+    if (startIdx !== -1 && endIdx !== -1) {
+      // 有标记：覆写标记之间的内容
+      const updated = content.substring(0, startIdx) + FNMAP_DOCS_EN.trim() + content.substring(endIdx + FNMAP_MARKER_END.length);
+      fs.writeFileSync(filePath, updated);
+      console.log(`${COLORS.green}✓${COLORS.reset} Updated fnmap documentation in ${displayName}`);
+    } else if (content.includes('.fnmap Code Index Format')) {
+      // 兼容旧版无标记格式：提示用户手动清理
+      console.log(`${COLORS.yellow}!${COLORS.reset} ${displayName} contains legacy fnmap docs without markers, please remove old fnmap sections manually and re-run`);
+    } else {
+      // 无 fnmap 内容：追加
+      fs.appendFileSync(filePath, FNMAP_DOCS_EN);
+      console.log(`${COLORS.green}✓${COLORS.reset} Added fnmap documentation to ${displayName}`);
     }
-    fs.appendFileSync(filePath, FNMAP_DOCS_EN);
   } else {
     fs.writeFileSync(filePath, FNMAP_DOCS_EN.trim() + '\n');
+    console.log(`${COLORS.green}✓${COLORS.reset} Added fnmap documentation to ${displayName}`);
   }
-  console.log(`${COLORS.green}✓${COLORS.reset} Added fnmap documentation to ${displayName}`);
 }
 
 /**
