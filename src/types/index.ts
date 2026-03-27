@@ -136,6 +136,7 @@ export interface CLIOptions {
   log?: boolean;
   init?: boolean;
   clear?: boolean;
+  hooks?: boolean;
 }
 
 // init 命令的交互式选项
@@ -143,6 +144,14 @@ export interface InitOptions {
   gitignore: boolean; // 是否添加 .gitignore 规则
   claudeMd: 'project' | 'user' | 'none'; // 写入项目还是用户的 CLAUDE.md
   cursorRules: boolean; // 是否写入 .cursorrules
+}
+
+// hooks 检测到的工具信息
+export interface DetectedTool {
+  name: string;        // 工具名：typescript, eslint, biome, prettier, vitest, jest, mocha
+  detected: boolean;   // 是否检测到
+  source: string;      // 检测来源描述
+  level: 'block' | 'warn'; // 错误反馈级别
 }
 
 // ============== 错误格式化上下文 ==============

@@ -84,6 +84,7 @@ export function setupCLI(): Command {
     .option('-l, --log', 'Show detailed processing logs')
     .option('--init', 'Create default config file and setup project (interactive)')
     .option('--clear', 'Clear generated files (.fnmap, *.fnmap, *.mermaid)')
+    .option('--hooks', 'Setup Claude Code hooks for auto quality checks')
     .argument('[files...]', 'Directly specify file paths')
     .allowUnknownOption(false)
     .addHelpText(
@@ -112,6 +113,7 @@ Examples:
   $ fnmap --clear                    Clear all generated files
   $ fnmap --merge --dir src          Merge into one .fnmap per directory
   $ fnmap --clear --dir src          Clear generated files in src directory
+  $ fnmap --hooks                    Setup Claude Code hooks
 `
     );
 
