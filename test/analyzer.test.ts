@@ -627,4 +627,226 @@ class Example {
       expect(info.classes[0]!.methods.length).toBeGreaterThan(0);
     });
   });
+
+  // ========== Vue SFC 测试 ==========
+
+  describe('Vue SFC', () => {
+    it('should parse Vue <script setup lang="ts">', () => {
+      const code = `
+<script setup lang="ts">
+import { ref, computed } from 'vue'
+
+const count = ref(0)
+
+function increment() {
+  count.value++
+}
+
+const double = computed(() => count.value * 2)
+</script>
+
+<template>
+  <button @click="increment">{{ count }} / {{ double }}</button>
+</template>
+      `;
+      const result = analyzeFile(code, 'Counter.vue');
+
+      expect(isParseError(result)).toBe(false);
+      const info = result as FileInfo;
+      expect(info.imports).toHaveLength(1);
+      expect(info.imports[0]!.module).toBe('vue');
+      expect(info.imports[0]!.members).toContain('ref');
+      expect(info.imports[0]!.members).toContain('computed');
+      expect(info.functions).toHaveLength(1);
+      expect(info.functions[0]!.name).toBe('increment');
+      expect(info.constants.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('should parse Vue <script> (non-setup)', () => {
+      const code = `
+<script>
+import { defineComponent } from 'vue'
+
+export default defineComponent({
+  name: 'MyComponent',
+  data() {
+    return { count: 0 }
+  },
+  methods: {
+    increment() {
+      this.count++
+    }
+  }
+})
+</script>
+      `;
+      const result = analyzeFile(code, 'Component.vue');
+
+      expect(isParseError(result)).toBe(false);
+      const info = result as FileInfo;
+      expect(info.imports).toHaveLength(1);
+      expect(info.imports[0]!.module).toBe('vue');
+    });
+
+    it('should detect TypeScript in Vue via lang="ts"', () => {
+      const code = `
+<script setup lang="ts">
+interface Props {
+  title: string
+  count?: number
+}
+
+function greet(name: string): string {
+  return 'Hello ' + name
+}
+</script>
+      `;
+      const result = analyzeFile(code, 'Typed.vue');
+
+      expect(isParseError(result)).toBe(false);
+      const info = result as FileInfo;
+      expect(info.functions).toHaveLength(1);
+      expect(info.functions[0]!.name).toBe('greet');
+      expect(info.functions[0]!.params).toBe('name');
+    });
+
+    it('should return error for Vue file without script block', () => {
+      const code = `
+<template>
+  <div>No script here</div>
+</template>
+
+<style scoped>
+div { color: red; }
+</style>
+      `;
+      const result = analyzeFile(code, 'NoScript.vue');
+
+      expect(isParseError(result)).toBe(true);
+    });
+  });
+
+  // ========== Svelte SFC 测试 ==========
+
+  describe('Svelte SFC', () => {
+    it('should parse Svelte <script lang="ts">', () => {
+      const code = `
+<script lang="ts">
+  import { onMount } from 'svelte';
+
+  let count: number = 0;
+
+  function increment() {
+    count += 1;
+  }
+
+  function decrement() {
+    count -= 1;
+  }
+
+  onMount(() => {
+    console.log('mounted');
+  });
+</script>
+
+<div>
+  <button on:click={decrement}>-</button>
+  <span>{count}</span>
+  <button on:click={increment}>+</button>
+</div>
+      `;
+      const result = analyzeFile(code, 'Counter.svelte');
+
+      expect(isParseError(result)).toBe(false);
+      const info = result as FileInfo;
+      expect(info.imports).toHaveLength(1);
+      expect(info.imports[0]!.module).toBe('svelte');
+      expect(info.imports[0]!.members).toContain('onMount');
+      expect(info.functions).toHaveLength(2);
+      expect(info.functions.map(f => f.name)).toContain('increment');
+      expect(info.functions.map(f => f.name)).toContain('decrement');
+    });
+
+    it('should parse Svelte <script> (JavaScript)', () => {
+      const code = `
+<script>
+  import { writable } from 'svelte/store';
+
+  const count = writable(0);
+
+  function reset() {
+    count.set(0);
+  }
+</script>
+
+<button on:click={reset}>Reset</button>
+      `;
+      const result = analyzeFile(code, 'Store.svelte');
+
+      expect(isParseError(result)).toBe(false);
+      const info = result as FileInfo;
+      expect(info.imports).toHaveLength(1);
+      expect(info.imports[0]!.module).toBe('svelte/store');
+      expect(info.functions).toHaveLength(1);
+      expect(info.functions[0]!.name).toBe('reset');
+      expect(info.constants).toHaveLength(1);
+      expect(info.constants[0]!.name).toBe('count');
+    });
+
+    it('should prefer instance script over module script', () => {
+      const code = `
+<script context="module">
+  export const preload = () => ({ props: {} });
+</script>
+
+<script>
+  export let name;
+
+  function greet() {
+    return 'Hello ' + name;
+  }
+</script>
+      `;
+      const result = analyzeFile(code, 'WithModule.svelte');
+
+      expect(isParseError(result)).toBe(false);
+      const info = result as FileInfo;
+      // 应优先提取实例 script，包含 greet 函数
+      expect(info.functions).toHaveLength(1);
+      expect(info.functions[0]!.name).toBe('greet');
+    });
+
+    it('should fall back to module script if no instance script', () => {
+      const code = `
+<script context="module">
+  export function helper(x) {
+    return x * 2;
+  }
+</script>
+
+<div>Static content</div>
+      `;
+      const result = analyzeFile(code, 'ModuleOnly.svelte');
+
+      expect(isParseError(result)).toBe(false);
+      const info = result as FileInfo;
+      expect(info.functions).toHaveLength(1);
+      expect(info.functions[0]!.name).toBe('helper');
+    });
+
+    it('should return error for Svelte file without script block', () => {
+      const code = `
+<div>
+  <p>No script here, just markup</p>
+</div>
+
+<style>
+  p { color: blue; }
+</style>
+      `;
+      const result = analyzeFile(code, 'NoScript.svelte');
+
+      expect(isParseError(result)).toBe(true);
+    });
+  });
 });
