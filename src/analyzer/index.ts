@@ -151,7 +151,7 @@ export function analyzeFile(code: unknown, filePath: string | null): AnalyzeResu
     const isTS = filePath && (filePath.endsWith('.ts') || filePath.endsWith('.tsx') || sfcLang === 'ts');
     ast = parser.parse(scriptCode, {
       sourceType: 'unambiguous',
-      plugins: ['jsx', 'classPrivateProperties', 'classPrivateMethods', ...(isTS ? (['typescript'] as const) : [])]
+      plugins: ['jsx', 'decorators-legacy', 'classPrivateProperties', 'classPrivateMethods', ...(isTS ? (['typescript'] as const) : [])]
     });
   } catch (e) {
     const error = e as Error & { loc?: { line: number; column: number } };
