@@ -38,6 +38,32 @@ function extractVueScript(sfcCode: string): { code: string; lang: string } | nul
   return { code: script.content, lang: script.lang ?? 'js' };
 }
 
+/** 从 Svelte SFC 中提取 script 块的代码和语言信息 */
+function extractSvelteScript(sfcCode: string): { code: string; lang: string } | null {
+  // 匹配 <script> 或 <script lang="ts"> 等，排除 <script context="module">
+  const scriptRegex = /<script(?:\s+[^>]*)?>(\s*[\s\S]*?)<\/script>/gi;
+  let bestMatch: { code: string; lang: string } | null = null;
+
+  let match;
+  while ((match = scriptRegex.exec(sfcCode)) !== null) {
+    const tag = match[0];
+    const content = match[1] ?? '';
+    // 跳过 context="module" 的模块级 script，优先实例 script
+    const isModule = /context\s*=\s*["']module["']/.test(tag) || /\bmodule\b/.test(tag);
+    const langMatch = tag.match(/lang\s*=\s*["'](ts|typescript)["']/i);
+    const lang = langMatch ? 'ts' : 'js';
+
+    if (!isModule) {
+      return { code: content, lang };
+    }
+    // module script 作为备选
+    if (!bestMatch) {
+      bestMatch = { code: content, lang };
+    }
+  }
+  return bestMatch;
+}
+
 /**
  * 分析JS/TS文件,提取结构信息
  */
@@ -101,27 +127,28 @@ export function analyzeFile(code: unknown, filePath: string | null): AnalyzeResu
     }
   }
 
-  // Vue SFC 预处理：提取 script 块
+  // SFC 预处理：提取 Vue/Svelte 的 script 块
   const isVue = filePath?.endsWith('.vue');
+  const isSvelte = filePath?.endsWith('.svelte');
   let scriptCode = code as string;
-  let vueLang = '';
-  if (isVue) {
-    const extracted = extractVueScript(scriptCode);
+  let sfcLang = '';
+  if (isVue || isSvelte) {
+    const extracted = isVue ? extractVueScript(scriptCode) : extractSvelteScript(scriptCode);
     if (!extracted) {
       return {
-        parseError: formatError(ErrorTypes.PARSE_ERROR, 'Failed to extract script from Vue SFC / 无法从 Vue SFC 提取 script', {
+        parseError: formatError(ErrorTypes.PARSE_ERROR, `Failed to extract script from ${isVue ? 'Vue' : 'Svelte'} SFC / 无法从 SFC 提取 script`, {
           file: filePath ?? undefined
         }),
         errorType: ErrorTypes.PARSE_ERROR
       };
     }
     scriptCode = extracted.code;
-    vueLang = extracted.lang;
+    sfcLang = extracted.lang;
   }
 
   let ast: t.File;
   try {
-    const isTS = filePath && (filePath.endsWith('.ts') || filePath.endsWith('.tsx') || vueLang === 'ts');
+    const isTS = filePath && (filePath.endsWith('.ts') || filePath.endsWith('.tsx') || sfcLang === 'ts');
     ast = parser.parse(scriptCode, {
       sourceType: 'unambiguous',
       plugins: ['jsx', 'classPrivateProperties', 'classPrivateMethods', ...(isTS ? (['typescript'] as const) : [])]
