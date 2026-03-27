@@ -1,0 +1,29 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const j=JSON.parse(require('fs').readFileSync(0,'utf8'));const f=j.tool_input?.file_path||'';if(f.endsWith('.fnmap')){console.log(JSON.stringify({hookSpecificOutput:{hookEventName:'PreToolUse',permissionDecision:'deny',permissionDecisionReason:'.fnmap 文件由脚本自动维护，禁止手动修改。请使用 fnmap --changed 命令更新。'}}));}\"",
+            "statusMessage": "检查 .fnmap 文件保护..."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/quality-check.sh",
+            "timeout": 120,
+            "statusMessage": "代码质量检查中..."
+          }
+        ]
+      }
+    ]
+  }
+}
