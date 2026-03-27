@@ -53,6 +53,7 @@
     "@babel/parser": "^7.28.5",
     "@babel/traverse": "^7.28.5",
     "@babel/types": "^7.28.5",
+    "@vue/compiler-sfc": "^3.5.31",
     "commander": "^14.0.2",
     "prettier": "^3.7.4"
   },

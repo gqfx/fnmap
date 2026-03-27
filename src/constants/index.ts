@@ -18,7 +18,7 @@ export const MAX_FILE_SIZE = 10 * 1024 * 1024;
 export const MAX_DIR_DEPTH = 50;
 
 // 默认支持的文件扩展名
-export const SUPPORTED_EXTENSIONS = ['.js', '.ts', '.jsx', '.tsx', '.mjs'] as const;
+export const SUPPORTED_EXTENSIONS = ['.js', '.ts', '.jsx', '.tsx', '.mjs', '.vue'] as const;
 export type SupportedExtension = (typeof SUPPORTED_EXTENSIONS)[number];
 
 // 默认排除的目录
@@ -36,6 +36,6 @@ export const DEFAULT_EXCLUDES = [
 // 默认配置
 export const DEFAULT_CONFIG: Required<FnmapConfig> = {
   enable: true,
-  include: ['**/*.js', '**/*.ts', '**/*.jsx', '**/*.tsx', '**/*.mjs'],
+  include: ['**/*.js', '**/*.ts', '**/*.jsx', '**/*.tsx', '**/*.mjs', '**/*.vue'],
   exclude: []
 };

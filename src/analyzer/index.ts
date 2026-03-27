@@ -2,6 +2,15 @@ import parser from '@babel/parser';
 import _traverse from '@babel/traverse';
 import type { NodePath } from '@babel/traverse';
 import type * as t from '@babel/types';
+// @vue/compiler-sfc 延迟加载，避免 ESM/CJS 兼容性问题
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+let _vueSfcModule: typeof import('@vue/compiler-sfc') | null = null;
+function getVueSfc(): typeof import('@vue/compiler-sfc') {
+  if (!_vueSfcModule) {
+    _vueSfcModule = require('@vue/compiler-sfc') as typeof import('@vue/compiler-sfc');
+  }
+  return _vueSfcModule;
+}
 import type {
   FileInfo,
   AnalyzeResult,
@@ -18,6 +27,16 @@ import { extractJSDocDescription, getLeadingComment } from './jsdoc';
 
 // 处理 ESM/CJS 兼容性
 const traverse = typeof _traverse === 'function' ? _traverse : (_traverse as { default: typeof _traverse }).default;
+
+/** 从 Vue SFC 中提取 script 块的代码和语言信息 */
+function extractVueScript(sfcCode: string): { code: string; lang: string } | null {
+  const { descriptor, errors } = getVueSfc().parse(sfcCode, { pad: 'line' });
+  if (errors.length > 0) return null;
+  // 优先 <script setup>，其次 <script>
+  const script = descriptor.scriptSetup ?? descriptor.script;
+  if (!script) return null;
+  return { code: script.content, lang: script.lang ?? 'js' };
+}
 
 /**
  * 分析JS/TS文件,提取结构信息
@@ -82,10 +101,28 @@ export function analyzeFile(code: unknown, filePath: string | null): AnalyzeResu
     }
   }
 
+  // Vue SFC 预处理：提取 script 块
+  const isVue = filePath?.endsWith('.vue');
+  let scriptCode = code as string;
+  let vueLang = '';
+  if (isVue) {
+    const extracted = extractVueScript(scriptCode);
+    if (!extracted) {
+      return {
+        parseError: formatError(ErrorTypes.PARSE_ERROR, 'Failed to extract script from Vue SFC / 无法从 Vue SFC 提取 script', {
+          file: filePath ?? undefined
+        }),
+        errorType: ErrorTypes.PARSE_ERROR
+      };
+    }
+    scriptCode = extracted.code;
+    vueLang = extracted.lang;
+  }
+
   let ast: t.File;
   try {
-    const isTS = filePath && (filePath.endsWith('.ts') || filePath.endsWith('.tsx'));
-    ast = parser.parse(code, {
+    const isTS = filePath && (filePath.endsWith('.ts') || filePath.endsWith('.tsx') || vueLang === 'ts');
+    ast = parser.parse(scriptCode, {
       sourceType: 'unambiguous',
       plugins: ['jsx', 'classPrivateProperties', 'classPrivateMethods', ...(isTS ? (['typescript'] as const) : [])]
     });
