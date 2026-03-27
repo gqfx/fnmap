@@ -4,19 +4,24 @@ import * as readline from 'node:readline';
 import type { DetectedTool } from '../types';
 import { COLORS } from '../constants';
 
-/** 读取 package.json 的所有依赖名 */
-function readDeps(projectDir: string): Set<string> {
+/** 读取并解析 package.json */
+function readPkg(projectDir: string): Record<string, any> | null {
   const pkgPath = path.join(projectDir, 'package.json');
-  if (!fs.existsSync(pkgPath)) return new Set();
+  if (!fs.existsSync(pkgPath)) return null;
   try {
-    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
-    return new Set([
-      ...Object.keys(pkg.dependencies || {}),
-      ...Object.keys(pkg.devDependencies || {})
-    ]);
+    return JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
   } catch {
-    return new Set();
+    return null;
   }
+}
+
+/** 从 package.json 提取所有依赖名 */
+function getDeps(pkg: Record<string, any> | null): Set<string> {
+  if (!pkg) return new Set();
+  return new Set([
+    ...Object.keys(pkg.dependencies || {}),
+    ...Object.keys(pkg.devDependencies || {})
+  ]);
 }
 
 /** 检查配置文件是否存在，返回匹配的文件名 */
@@ -36,14 +41,10 @@ function findConfigFile(projectDir: string, patterns: string[]): string | null {
 }
 
 /** 判断依赖来源描述 */
-function depSource(projectDir: string, depName: string): string {
-  const pkgPath = path.join(projectDir, 'package.json');
-  if (!fs.existsSync(pkgPath)) return '';
-  try {
-    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
-    if (pkg.devDependencies?.[depName]) return 'devDependencies';
-    if (pkg.dependencies?.[depName]) return 'dependencies';
-  } catch { /* ignore */ }
+function depSource(pkg: Record<string, any> | null, depName: string): string {
+  if (!pkg) return '';
+  if (pkg.devDependencies?.[depName]) return 'devDependencies';
+  if (pkg.dependencies?.[depName]) return 'dependencies';
   return '';
 }
 
@@ -75,19 +76,19 @@ if [ $? -ne 0 ]; then
   BLOCK_ERRORS="$BLOCK_ERRORS\\n[TypeScript 类型错误]\\n$TS_ERRORS"
 fi`,
   eslint: `# ESLint 检查（仅变更文件）
-LINT_OUTPUT=$(echo "$ALL_CHANGED" | xargs npx eslint --no-warn 2>&1)
+LINT_OUTPUT=$(echo "$ALL_CHANGED" | xargs -d '\\n' npx eslint --no-warn 2>&1)
 if [ $? -ne 0 ]; then
   LINT_ERRORS=$(echo "$LINT_OUTPUT" | head -30)
   WARN_MESSAGES="$WARN_MESSAGES\\n[ESLint 问题]\\n$LINT_ERRORS"
 fi`,
   biome: `# Biome 检查（仅变更文件）
-BIOME_OUTPUT=$(echo "$ALL_CHANGED" | xargs npx biome check 2>&1)
+BIOME_OUTPUT=$(echo "$ALL_CHANGED" | xargs -d '\\n' npx biome check 2>&1)
 if [ $? -ne 0 ]; then
   BIOME_ERRORS=$(echo "$BIOME_OUTPUT" | head -30)
   WARN_MESSAGES="$WARN_MESSAGES\\n[Biome 问题]\\n$BIOME_ERRORS"
 fi`,
   prettier: `# Prettier 格式检查（仅变更文件）
-PRETTIER_OUTPUT=$(echo "$ALL_CHANGED" | xargs npx prettier --check 2>&1)
+PRETTIER_OUTPUT=$(echo "$ALL_CHANGED" | xargs -d '\\n' npx prettier --check 2>&1)
 if [ $? -ne 0 ]; then
   PRETTIER_ERRORS=$(echo "$PRETTIER_OUTPUT" | grep -v '^\\[warn\\]' | head -20)
   WARN_MESSAGES="$WARN_MESSAGES\\n[Prettier 格式问题]\\n$PRETTIER_ERRORS"
@@ -287,12 +288,13 @@ export async function executeHooksSetup(projectDir: string, rl?: readline.Interf
 
 /** 检测项目中安装的工具 */
 export function detectTools(projectDir: string): DetectedTool[] {
-  const deps = readDeps(projectDir);
+  const pkg = readPkg(projectDir);
+  const deps = getDeps(pkg);
 
   return TOOL_RULES.map(rule => {
     const foundDep = rule.depNames.find(d => deps.has(d));
     if (foundDep) {
-      const src = depSource(projectDir, foundDep);
+      const src = depSource(pkg, foundDep);
       return { name: rule.name, detected: true, source: src || 'dependencies', level: rule.level };
     }
     const configFile = findConfigFile(projectDir, rule.configPatterns);
