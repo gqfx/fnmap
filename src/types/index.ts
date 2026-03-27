@@ -131,6 +131,7 @@ export interface CLIOptions {
   project: string;
   changed?: boolean;
   staged?: boolean;
+  merge?: boolean;
   mermaid?: boolean | 'file' | 'project';
   log?: boolean;
   init?: boolean;

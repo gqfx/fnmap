@@ -108,7 +108,7 @@ describe('CLI', () => {
 
     // 验证统计信息输出（始终显示）
     expect(console.log).toHaveBeenCalledWith(expect.stringContaining('Complete'));
-    // 应该会生成 .fnmap 文件
-    expect(fs.existsSync(path.join(subDir, '.fnmap'))).toBe(true);
+    // 默认按文件生成 filename.fnmap
+    expect(fs.existsSync(path.join(subDir, 'a.fnmap'))).toBe(true);
   });
 });

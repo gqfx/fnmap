@@ -315,8 +315,6 @@ export async function main(): Promise<void> {
 
   // 确定要处理的文件列表
   let filesToProcess: string[] = [];
-  // 标记是否为单文件模式（-f 参数）
-  let singleFileMode = false;
 
   if (options.changed || options.staged) {
     // 基于git改动 - 增量模式
@@ -338,8 +336,7 @@ export async function main(): Promise<void> {
       filesToProcess.push(...dirFiles);
     }
   } else if (fileArgs.length > 0) {
-    // 指定的文件 - 单文件模式
-    singleFileMode = true;
+    // 指定的文件
     filesToProcess = fileArgs.map((f) => (path.isAbsolute(f) ? f : path.resolve(projectDir, f)));
   } else if (options.dir) {
     // 扫描指定目录
@@ -405,6 +402,7 @@ export async function main(): Promise<void> {
 
   let processed = 0;
   let failed = 0;
+  const failedFiles: { file: string; reason: string }[] = [];
   const dirFilesMap = new Map<string, FileInfoEntry[]>();
 
   for (const filePath of filesToProcess) {
@@ -445,6 +443,7 @@ export async function main(): Promise<void> {
       dirFilesMap.get(dir)!.push({ relativePath, info });
     } else {
       failed++;
+      failedFiles.push({ file: relativePath, reason: result.error });
       logger.error(result.error);
     }
   }
@@ -453,8 +452,21 @@ export async function main(): Promise<void> {
   if (dirFilesMap.size > 0) {
     logger.info('\nGenerating .fnmap index...');
 
-    if (singleFileMode) {
-      // 单文件模式：为每个文件生成 filename.fnmap
+    if (options.merge) {
+      // 聚合模式：每个目录生成一个 .fnmap
+      for (const [dir, filesInfo] of dirFilesMap) {
+        try {
+          const mapContent = generateAiMap(dir, filesInfo);
+          const mapPath = path.join(dir, '.fnmap');
+          fs.writeFileSync(mapPath, mapContent);
+          logger.success(path.relative(projectDir, mapPath));
+        } catch (err) {
+          const error = err as Error;
+          logger.error(`Failed to generate .fnmap for ${path.relative(projectDir, dir)}: ${error.message}`);
+        }
+      }
+    } else {
+      // 默认模式：为每个文件生成独立的 filename.fnmap
       for (const [dir, filesInfo] of dirFilesMap) {
         for (const { relativePath, info } of filesInfo) {
           try {
@@ -467,19 +479,6 @@ export async function main(): Promise<void> {
             const error = err as Error;
             logger.error(`Failed to generate .fnmap for ${relativePath}: ${error.message}`);
           }
-        }
-      }
-    } else {
-      // 目录模式：每个目录生成一个 .fnmap
-      for (const [dir, filesInfo] of dirFilesMap) {
-        try {
-          const mapContent = generateAiMap(dir, filesInfo);
-          const mapPath = path.join(dir, '.fnmap');
-          fs.writeFileSync(mapPath, mapContent);
-          logger.success(path.relative(projectDir, mapPath));
-        } catch (err) {
-          const error = err as Error;
-          logger.error(`Failed to generate .fnmap for ${path.relative(projectDir, dir)}: ${error.message}`);
         }
       }
     }
@@ -529,5 +528,11 @@ export async function main(): Promise<void> {
   logger.stats(
     `Complete! Analyzed: ${COLORS.green}${processed}${COLORS.reset}, Failed: ${failed > 0 ? COLORS.red : ''}${failed}${COLORS.reset}`
   );
+  // 始终输出失败文件的详情
+  if (failedFiles.length > 0) {
+    for (const { file, reason } of failedFiles) {
+      logger.stats(`  ${COLORS.red}✗${COLORS.reset} ${file}: ${reason}`);
+    }
+  }
   logger.info('='.repeat(50));
 }

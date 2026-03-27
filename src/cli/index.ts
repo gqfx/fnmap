@@ -79,6 +79,7 @@ export function setupCLI(): Command {
     .option('-p, --project <dir>', 'Specify project root directory (default: current directory)', (val: string) => normalizePath(val), process.env.CLAUDE_PROJECT_DIR ?? process.cwd())
     .option('-c, --changed', 'Process only git changed files (staged + modified + untracked)')
     .option('-s, --staged', 'Process only git staged files (for pre-commit hook)')
+    .option('--merge', 'Merge all files in same directory into one .fnmap (default: per-file)')
     .option('-m, --mermaid [mode]', 'Generate Mermaid call graph (file=file-level, project=project-level)')
     .option('-l, --log', 'Show detailed processing logs')
     .option('--init', 'Create default config file and setup project (interactive)')
@@ -94,8 +95,8 @@ Configuration files (by priority):
   package.json#fnmap    fnmap field in package.json
 
 Output:
-  .fnmap                Code index file in directory mode (imports, functions, classes, constants, call graph)
-  *.fnmap               Individual file index when using --files (e.g., module.fnmap)
+  *.fnmap               Per-file code index (default, e.g., module.fnmap)
+  .fnmap                Merged directory index (when using --merge)
   *.mermaid             Mermaid call graph (when using --mermaid file)
   .fnmap.mermaid        Project-level Mermaid call graph (when using --mermaid project)
 
@@ -109,6 +110,7 @@ Examples:
   $ fnmap --mermaid project          Generate project-level call graph
   $ fnmap --init                     Interactive project setup
   $ fnmap --clear                    Clear all generated files
+  $ fnmap --merge --dir src          Merge into one .fnmap per directory
   $ fnmap --clear --dir src          Clear generated files in src directory
 `
     );
