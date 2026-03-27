@@ -20,6 +20,7 @@ export default defineConfig({
         '@babel/traverse',
         '@babel/generator',
         '@babel/types',
+        '@vue/compiler-sfc',
         'commander',
         'prettier'
       ]

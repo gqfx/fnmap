@@ -11,6 +11,7 @@ import { processFile } from './processor';
 import { generateAiMap, generateFileMermaid, generateProjectMermaid } from './generator';
 import { normalizePath } from './validation';
 import { executeHooksSetup } from './hooks';
+import { executeAliasConvert } from './alias';
 
 /** fnmap 注入内容的起止标记 */
 const FNMAP_MARKER_START = '<!-- fnmap:start -->';
@@ -302,6 +303,54 @@ async function executeInitInteractive(projectDir: string): Promise<void> {
 }
 
 /**
+ * 根据 CLI 选项收集待处理的文件列表
+ */
+function collectFiles(projectDir: string, options: CLIOptions, args: string[]): string[] {
+  const fileArgs = [...(options.files ?? []), ...args.map(normalizePath)].filter((f) => fs.existsSync(f));
+  let files: string[] = [];
+
+  if (options.changed || options.staged) {
+    const changedFiles = getGitChangedFiles(projectDir, options.staged);
+    const affectedDirs = new Set<string>();
+    for (const filePath of changedFiles) {
+      affectedDirs.add(path.dirname(filePath));
+    }
+    for (const dir of affectedDirs) {
+      files.push(...scanSingleDirectory(dir));
+    }
+  } else if (fileArgs.length > 0) {
+    files = fileArgs.map((f) => (path.isAbsolute(f) ? f : path.resolve(projectDir, f)));
+  } else if (options.dir) {
+    const targetDir = path.resolve(projectDir, options.dir);
+    const relFiles = scanDirectory(targetDir, projectDir);
+    files = relFiles.map((f) => path.join(projectDir, f));
+  } else {
+    // 从配置中读取 include 目录
+    const { config } = loadConfig(projectDir);
+    if (config && config.enable !== false) {
+      const mergedConfig = mergeConfig(config);
+      const excludes = [...DEFAULT_EXCLUDES, ...mergedConfig.exclude];
+      if (mergedConfig.include && mergedConfig.include.length > 0) {
+        const includeDirs = new Set<string>();
+        for (const pattern of mergedConfig.include) {
+          const dir = pattern.replace(/\/\*\*\/.*$/, '').replace(/\*\*\/.*$/, '').replace(/\/\*\..*$/, '').replace(/\*\..*$/, '');
+          if (dir) includeDirs.add(dir);
+        }
+        for (const dir of includeDirs) {
+          const targetDir = path.resolve(projectDir, dir);
+          if (fs.existsSync(targetDir)) {
+            const relFiles = scanDirectory(targetDir, projectDir, excludes);
+            files.push(...relFiles.map((f) => path.join(projectDir, f)));
+          }
+        }
+      }
+    }
+  }
+
+  return [...new Set(files)];
+}
+
+/**
  * 主函数
  */
 export async function main(): Promise<void> {
@@ -342,6 +391,26 @@ export async function main(): Promise<void> {
     const originalQuietMode = isQuietMode();
     setQuietMode(false);
     await executeInitInteractive(projectDir);
+    setQuietMode(originalQuietMode);
+    return;
+  }
+
+  // alias命令：转换相对导入为别名导入
+  if (options.alias) {
+    const originalQuietMode = isQuietMode();
+    setQuietMode(false);
+    // 收集文件列表（复用已有的文件发现逻辑）
+    const aliasFiles = collectFiles(projectDir, options, args);
+    if (aliasFiles.length === 0) {
+      logger.info('No files found to process');
+      setQuietMode(originalQuietMode);
+      return;
+    }
+    executeAliasConvert({
+      dryRun: !options.write,
+      files: aliasFiles,
+      projectDir,
+    });
     setQuietMode(originalQuietMode);
     return;
   }

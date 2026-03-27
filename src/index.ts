@@ -62,6 +62,10 @@ export type { ProcessCodeOptions } from './processor';
 // 导出 hooks
 export { detectTools, generateQualityScript, installHooks, executeHooksSetup } from './hooks';
 
+// 导出别名转换
+export { detectAliasFromTsconfig, resolveAliasPath, transformImports, executeAliasConvert } from './alias';
+export type { AliasConfig, AliasTransformResult, AliasCommandOptions } from './alias';
+
 // 导出主函数
 import { main } from './main';
 export { main };

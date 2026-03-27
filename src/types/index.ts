@@ -137,6 +137,8 @@ export interface CLIOptions {
   init?: boolean;
   clear?: boolean;
   hooks?: boolean;
+  alias?: boolean;
+  write?: boolean;
 }
 
 // init 命令的交互式选项

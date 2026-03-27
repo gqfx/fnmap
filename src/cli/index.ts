@@ -85,6 +85,8 @@ export function setupCLI(): Command {
     .option('--init', 'Create default config file and setup project (interactive)')
     .option('--clear', 'Clear generated files (.fnmap, *.fnmap, *.mermaid)')
     .option('--hooks', 'Setup Claude Code hooks for auto quality checks')
+    .option('--alias', 'Convert ../ relative imports to alias imports (detected from tsconfig.json)')
+    .option('--write', 'Write changes to files (use with --alias, default is dry-run)')
     .argument('[files...]', 'Directly specify file paths')
     .allowUnknownOption(false)
     .addHelpText(
@@ -114,6 +116,8 @@ Examples:
   $ fnmap --merge --dir src          Merge into one .fnmap per directory
   $ fnmap --clear --dir src          Clear generated files in src directory
   $ fnmap --hooks                    Setup Claude Code hooks
+  $ fnmap --alias --dir src          Preview alias import conversion
+  $ fnmap --alias --write --dir src  Apply alias import conversion
 `
     );
 
